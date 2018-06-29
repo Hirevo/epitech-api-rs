@@ -1,0 +1,12 @@
+[package]
+name = "epitech-api"
+version = "0.1.0"
+authors = ["Hirevo <nipolom@live.fr>"]
+
+[dependencies]
+reqwest = "*"
+chrono = "*"
+serde = "*"
+serde_derive = "*"
+serde_json = "*"
+hyper = "*"
