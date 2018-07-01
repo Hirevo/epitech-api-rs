@@ -1,7 +1,17 @@
 [package]
-name = "epitech-api"
+name = "epitech_api"
 version = "0.1.0"
 authors = ["Hirevo <nipolom@live.fr>"]
+description = "A library for interacting with the EPITECH intranet API built on top of reqwest"
+readme = "README.md"
+keywords = ["epitech", "api", "intranet"]
+categories = ["web-programming"]
+repository = "https://github.com/Hirevo/epitech-api-rs"
+license = "MIT"
+
+[badges]
+circle-ci = { repository = "Hirevo/epitech-api-rs", branch = "master" }
+maintenance = { status = "actively-developed" }
 
 [dependencies]
 reqwest = "*"
