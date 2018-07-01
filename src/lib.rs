@@ -27,6 +27,7 @@ struct EpitechClientBuilder {
 struct EpitechClient {
     autologin: String,
     client: reqwest::Client,
+    login: String,
 }
 
 #[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord)]
@@ -66,6 +67,12 @@ pub struct StudentListFetchBuilder {
     offset: u32,
 }
 
+#[derive(Debug, Clone)]
+pub struct StudentDataFetchBuilder {
+    client: EpitechClient,
+    login: Option<String>,
+}
+
 #[derive(Debug, Clone, Eq, Ord, PartialEq, PartialOrd)]
 enum Error {
     InvalidStatusCode(u16),
@@ -81,12 +88,13 @@ impl EpitechClientBuilder {
         }
     }
 
-    fn autologin<T: Into<String>>(&mut self, autologin: T) -> &mut EpitechClientBuilder {
+    #[inline]
+    fn autologin<'a, T: Into<String>>(mut self, autologin: T) -> EpitechClientBuilder {
         self.autologin = autologin.into();
         self
     }
 
-    fn authenticate(&mut self) -> Result<EpitechClient, Error> {
+    fn authenticate(self) -> Result<EpitechClient, Error> {
         let client = match reqwest::Client::builder()
             .redirect(reqwest::RedirectPolicy::none())
             .build()
@@ -108,13 +116,21 @@ impl EpitechClientBuilder {
                         }
                     }
                     headers.set(new_cookie);
-                    Ok(EpitechClient {
+                    let mut client = EpitechClient {
                         autologin: self.autologin.clone(),
                         client: match reqwest::Client::builder().default_headers(headers).build() {
                             Ok(x) => x,
                             Err(_) => return Err(Error::InternalError),
                         },
-                    })
+                        login: String::default(),
+                    };
+                    match client.fetch_student_data().send() {
+                        Some(data) => {
+                            client.login = data.login.clone();
+                            Ok(client)
+                        }
+                        None => Err(Error::InternalError),
+                    }
                 }
                 None => Err(Error::CookieNotFound),
             },
@@ -130,6 +146,7 @@ impl EpitechClientBuilder {
 }
 
 impl EpitechClient {
+    #[inline]
     fn builder() -> EpitechClientBuilder {
         EpitechClientBuilder::new()
     }
@@ -151,23 +168,61 @@ impl EpitechClient {
             .ok()
     }
 
-    fn fetch_student_list(&mut self) -> StudentListFetchBuilder {
-        let mut builder = StudentListFetchBuilder::new();
-        builder.client(self.clone());
-        builder
+    fn fetch_student_list(&self) -> StudentListFetchBuilder {
+        StudentListFetchBuilder::new().client(self.clone())
+    }
+
+    fn fetch_student_data(&self) -> StudentDataFetchBuilder {
+        StudentDataFetchBuilder::new().client(self.clone())
+    }
+
+    fn fetch_student_netsoul<'a>(
+        &self,
+        login: &'a str,
+    ) -> Option<Vec<response::UserNetsoulEntry>> {
+        let url = format!("/user/{}/netsoul", login);
+        self.make_request(url)
+            .and_then(|text| serde_json::from_str(&text).ok())
+    }
+
+    fn fetch_own_student_netsoul(&self) -> Option<Vec<response::UserNetsoulEntry>> {
+        self.fetch_student_netsoul(self.login.as_ref())
+    }
+
+    fn fetch_student_notes<'a>(&self, login: &'a str) -> Option<response::UserNotes> {
+        let url = format!("/user/{}/notes", login);
+        self.make_request(url)
+            .and_then(|text| serde_json::from_str(&text).ok())
+    }
+
+    fn fetch_own_student_notes(&self) -> Option<response::UserNotes> {
+        self.fetch_student_notes(self.login.as_ref())
+    }
+
+    fn fetch_student_binomes<'a>(&self, login: &'a str) -> Option<response::UserBinome> {
+        let url = format!("/user/{}/binome", login);
+        self.make_request(url)
+            .and_then(|text| serde_json::from_str(&text).ok())
+    }
+
+    fn fetch_own_student_binomes(&self) -> Option<response::UserBinome> {
+        self.fetch_student_binomes(self.login.as_ref())
     }
 }
 
 impl Default for EpitechClient {
+    #[inline]
     fn default() -> EpitechClient {
         EpitechClient {
-            autologin: String::from("NotAssigned"),
+            autologin: String::default(),
             client: reqwest::Client::new(),
+            login: String::default(),
         }
     }
 }
 
 impl StudentListFetchBuilder {
+    #[inline]
     fn new() -> StudentListFetchBuilder {
         StudentListFetchBuilder {
             client: EpitechClient::default(),
@@ -180,7 +235,7 @@ impl StudentListFetchBuilder {
         }
     }
 
-    fn send(&mut self) -> Option<Vec<response::UserEntry>> {
+    fn send(self) -> Option<Vec<response::UserEntry>> {
         let mut url = String::from(format!("/user/filter/user?offset={}", self.offset));
         match self.location {
             Some(ref location) => url.push_str(format!("&location={}", location).as_ref()),
@@ -199,44 +254,81 @@ impl StudentListFetchBuilder {
             .and_then(|val| {
                 val.as_object()
                     .and_then(|object| object.get("items"))
-                    .and_then(|item| {
-                        serde_json::from_value::<Vec<response::UserEntry>>(item.clone()).ok()
-                    })
+                    .and_then(|item| serde_json::from_value(item.clone()).ok())
             })
     }
 
-    fn client(&mut self, client: EpitechClient) -> &mut StudentListFetchBuilder {
+    #[inline]
+    fn client(mut self, client: EpitechClient) -> StudentListFetchBuilder {
         self.client = client;
         self
     }
 
-    fn location(&mut self, location: Location) -> &mut StudentListFetchBuilder {
+    #[inline]
+    fn location(mut self, location: Location) -> StudentListFetchBuilder {
         self.location = Some(location);
         self
     }
 
-    fn active(&mut self, active: bool) -> &mut StudentListFetchBuilder {
+    #[inline]
+    fn active(mut self, active: bool) -> StudentListFetchBuilder {
         self.active = active;
         self
     }
 
-    fn offset(&mut self, offset: u32) -> &mut StudentListFetchBuilder {
+    #[inline]
+    fn offset(mut self, offset: u32) -> StudentListFetchBuilder {
         self.offset = offset;
         self
     }
 
-    fn year(&mut self, year: u32) -> &mut StudentListFetchBuilder {
+    #[inline]
+    fn year(mut self, year: u32) -> StudentListFetchBuilder {
         self.year = year;
         self
     }
 
-    fn promo(&mut self, promo: Promo) -> &mut StudentListFetchBuilder {
+    #[inline]
+    fn promo(mut self, promo: Promo) -> StudentListFetchBuilder {
         self.promo = Some(promo);
         self
     }
 
-    fn course(&mut self, course: String) -> &mut StudentListFetchBuilder {
-        self.course = course;
+    #[inline]
+    fn course<T: Into<String>>(mut self, course: T) -> StudentListFetchBuilder {
+        self.course = course.into();
+        self
+    }
+}
+
+impl StudentDataFetchBuilder {
+    #[inline]
+    fn new() -> StudentDataFetchBuilder {
+        StudentDataFetchBuilder {
+            client: EpitechClient::default(),
+            login: None,
+        }
+    }
+
+    fn send(self) -> Option<response::UserData> {
+        let url = self.login
+            .as_ref()
+            .map(|login| format!("/user/{}", login))
+            .unwrap_or_else(|| String::from("/user"));
+        self.client
+            .make_request(url)
+            .and_then(|text| serde_json::from_str(&text).ok())
+    }
+
+    #[inline]
+    fn client<'a>(mut self, client: EpitechClient) -> StudentDataFetchBuilder {
+        self.client = client;
+        self
+    }
+
+    #[inline]
+    fn login<T: Into<String>>(mut self, login: T) -> StudentDataFetchBuilder {
+        self.login = Some(login.into());
         self
     }
 }
@@ -379,7 +471,7 @@ mod tests {
     fn fetch_student_list() {
         let ret = get_client();
         assert!(ret.is_ok());
-        let mut api = ret.unwrap();
+        let api = ret.unwrap();
         let list = api.fetch_student_list()
             .location(Location::Strasbourg)
             .promo(Promo::Tek2)
@@ -388,4 +480,59 @@ mod tests {
         assert!(list.is_some());
     }
 
+    #[test]
+    fn fetch_own_student_data() {
+        let ret = get_client();
+        assert!(ret.is_ok());
+        let api = ret.unwrap();
+        let list = api.fetch_student_data().send();
+        assert!(list.is_some());
+    }
+
+    #[test]
+    fn fetch_other_student_data() {
+        let ret = get_client();
+        assert!(ret.is_ok());
+        let api = ret.unwrap();
+        let list = api.fetch_student_data()
+            .login("nicolas.polomack@epitech.eu")
+            .send();
+        assert!(list.is_some());
+    }
+
+    // #[test]
+    // fn fetch_own_student_netsoul() {
+    //     let ret = get_client();
+    //     assert!(ret.is_ok());
+    //     let api = ret.unwrap();
+    //     let list = api.fetch_own_student_netsoul();
+    //     assert!(list.is_some());
+    // }
+
+    #[test]
+    fn fetch_other_student_netsoul() {
+        let ret = get_client();
+        assert!(ret.is_ok());
+        let api = ret.unwrap();
+        let list = api.fetch_student_netsoul("nicolas.polomack@epitech.eu");
+        assert!(list.is_some());
+    }
+
+    #[test]
+    fn fetch_other_student_notes() {
+        let ret = get_client();
+        assert!(ret.is_ok());
+        let api = ret.unwrap();
+        let list = api.fetch_student_notes("nicolas.polomack@epitech.eu");
+        assert!(list.is_some());
+    }
+
+    #[test]
+    fn fetch_other_student_binomes() {
+        let ret = get_client();
+        assert!(ret.is_ok());
+        let api = ret.unwrap();
+        let list = api.fetch_student_binomes("nicolas.polomack@epitech.eu");
+        assert!(list.is_some());
+    }
 }
