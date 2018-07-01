@@ -7,6 +7,8 @@ extern crate serde;
 extern crate serde_json;
 #[macro_use]
 extern crate serde_derive;
+#[macro_use]
+extern crate lazy_static;
 
 mod constants;
 mod response;
@@ -30,7 +32,7 @@ struct EpitechClient {
     login: String,
 }
 
-#[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord)]
+#[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Hash)]
 pub enum Location {
     Bordeaux,
     LaReunion,
@@ -49,7 +51,7 @@ pub enum Location {
     Barcelone,
 }
 
-#[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord)]
+#[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Hash)]
 pub enum Promo {
     Tek1,
     Tek2,
@@ -176,10 +178,7 @@ impl EpitechClient {
         StudentDataFetchBuilder::new().client(self.clone())
     }
 
-    fn fetch_student_netsoul<'a>(
-        &self,
-        login: &'a str,
-    ) -> Option<Vec<response::UserNetsoulEntry>> {
+    fn fetch_student_netsoul<'a>(&self, login: &'a str) -> Option<Vec<response::UserNetsoulEntry>> {
         let url = format!("/user/{}/netsoul", login);
         self.make_request(url)
             .and_then(|text| serde_json::from_str(&text).ok())
@@ -387,7 +386,7 @@ impl FromStr for Location {
     type Err = ();
     fn from_str(string: &str) -> Result<Self, Self::Err> {
         for it in constants::LOCATION_TABLE.iter() {
-            if string == it.1 {
+            if string == *it.1 {
                 return Ok(it.0.clone());
             }
         }
@@ -397,12 +396,11 @@ impl FromStr for Location {
 
 impl Display for Location {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        for it in constants::LOCATION_TABLE.iter() {
-            if *self == it.0 {
-                return write!(f, "{}", it.1);
-            }
-        }
-        write!(f, "Unknown")
+        let ret = constants::LOCATION_TABLE
+            .get(self)
+            .map(|val| *val)
+            .unwrap_or("Unknown");
+        write!(f, "{}", ret)
     }
 }
 
@@ -410,7 +408,7 @@ impl FromStr for Promo {
     type Err = ();
     fn from_str(string: &str) -> Result<Self, Self::Err> {
         for it in constants::PROMO_TABLE.iter() {
-            if string == it.1 {
+            if string == *it.1 {
                 return Ok(it.0.clone());
             }
         }
@@ -420,12 +418,11 @@ impl FromStr for Promo {
 
 impl Display for Promo {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        for it in constants::PROMO_TABLE.iter() {
-            if *self == it.0 {
-                return write!(f, "{}", it.1);
-            }
-        }
-        write!(f, "Unknown")
+        let ret = constants::PROMO_TABLE
+            .get(self)
+            .map(|val| *val)
+            .unwrap_or("Unknown");
+        write!(f, "{}", ret)
     }
 }
 
