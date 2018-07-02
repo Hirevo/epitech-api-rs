@@ -2,12 +2,14 @@ version: 2
 jobs:
   build:
     docker:
-      - image: debian:stretch
+      - image: nicolaspolomack/debian-rust
+    working_directory: /build/epitech-api-rs
     steps:
-      - checkout
+      - checkout:
+          path: /build
       - run:
           name: Standard build
           command: cargo build
-      - run:
-          name: Cargo tests
-          command: cargo test
+      # - run:
+      #     name: Cargo tests
+      #     command: cargo test
