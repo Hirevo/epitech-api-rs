@@ -9,7 +9,9 @@ jobs:
           path: /build
       - run:
           name: Standard build
-          command: cargo build
+          command: |
+            source ~/.bashrc
+            cargo build
       # - run:
       #     name: Cargo tests
       #     command: cargo test
