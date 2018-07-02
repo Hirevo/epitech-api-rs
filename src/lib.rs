@@ -75,6 +75,12 @@ pub struct StudentDataFetchBuilder {
     login: Option<String>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct UserEntries {
+    pub total: usize,
+    pub items: Vec<response::UserEntry>,
+}
+
 #[derive(Debug, Clone, Eq, Ord, PartialEq, PartialOrd)]
 pub enum Error {
     InvalidStatusCode(u16),
@@ -178,7 +184,10 @@ impl EpitechClient {
         StudentDataFetchBuilder::new().client(self.clone())
     }
 
-    pub fn fetch_student_netsoul<'a>(&self, login: &'a str) -> Option<Vec<response::UserNetsoulEntry>> {
+    pub fn fetch_student_netsoul<'a>(
+        &self,
+        login: &'a str,
+    ) -> Option<Vec<response::UserNetsoulEntry>> {
         let url = format!("/user/{}/netsoul", login);
         self.make_request(url)
             .and_then(|text| serde_json::from_str(&text).ok())
@@ -249,11 +258,19 @@ impl StudentListFetchBuilder {
         url.push_str(format!("&active={}", self.active).as_ref());
         self.client
             .make_request(&url)
-            .and_then(|text| serde_json::from_str::<serde_json::Value>(&text).ok())
-            .and_then(|val| {
-                val.as_object()
-                    .and_then(|object| object.get("items"))
-                    .and_then(|item| serde_json::from_value(item.clone()).ok())
+            .and_then(|text| serde_json::from_str::<UserEntries>(&text).ok())
+            .and_then(|mut v| {
+                let state: usize = (self.offset as usize) + v.items.len();
+                if state == v.total {
+                    Some(v.items)
+                } else if state >= v.total {
+                    None
+                } else {
+                    self.offset(state as u32).send().map(|mut x| {
+                        v.items.append(&mut x);
+                        v.items
+                    })
+                }
             })
     }
 
@@ -475,6 +492,26 @@ mod tests {
             .year(2017)
             .send();
         assert!(list.is_some());
+    }
+
+    #[test]
+    fn fetch_all_students_list() {
+        let ret = get_client();
+        assert!(ret.is_ok());
+        let api = ret.unwrap();
+        let mut list = Vec::default();
+        for promo in constants::PROMO_TABLE.iter() {
+            for location in constants::LOCATION_TABLE.iter() {
+                println!("{} {}", promo.0, location.0);
+                let ret = api.fetch_student_list()
+                    .location(location.0.clone())
+                    .promo(promo.0.clone())
+                    .year(2017)
+                    .send();
+                list.append(&mut ret.unwrap_or(Vec::default()));
+            }
+        }
+        assert!(list.len() != 0);
     }
 
     #[test]
