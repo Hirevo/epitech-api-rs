@@ -11,7 +11,7 @@ extern crate serde_derive;
 extern crate lazy_static;
 
 mod constants;
-mod response;
+pub mod response;
 
 use chrono::prelude::*;
 use reqwest::header;

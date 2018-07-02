@@ -1,5 +1,3 @@
-extern crate lazy_static;
-
 use std::collections::HashMap;
 use {Location, Promo};
 
