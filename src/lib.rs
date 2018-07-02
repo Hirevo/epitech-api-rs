@@ -21,12 +21,12 @@ use std::fmt::Display;
 use std::str::FromStr;
 
 #[derive(Debug, Clone)]
-struct EpitechClientBuilder {
+pub struct EpitechClientBuilder {
     autologin: String,
 }
 
 #[derive(Debug, Clone)]
-struct EpitechClient {
+pub struct EpitechClient {
     autologin: String,
     client: reqwest::Client,
     login: String,
@@ -76,7 +76,7 @@ pub struct StudentDataFetchBuilder {
 }
 
 #[derive(Debug, Clone, Eq, Ord, PartialEq, PartialOrd)]
-enum Error {
+pub enum Error {
     InvalidStatusCode(u16),
     CookieNotFound,
     UnreachableRemote,
