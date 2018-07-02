@@ -84,19 +84,19 @@ pub enum Error {
 }
 
 impl EpitechClientBuilder {
-    fn new() -> EpitechClientBuilder {
+    pub fn new() -> EpitechClientBuilder {
         EpitechClientBuilder {
             autologin: String::default(),
         }
     }
 
     #[inline]
-    fn autologin<'a, T: Into<String>>(mut self, autologin: T) -> EpitechClientBuilder {
+    pub fn autologin<'a, T: Into<String>>(mut self, autologin: T) -> EpitechClientBuilder {
         self.autologin = autologin.into();
         self
     }
 
-    fn authenticate(self) -> Result<EpitechClient, Error> {
+    pub fn authenticate(self) -> Result<EpitechClient, Error> {
         let client = match reqwest::Client::builder()
             .redirect(reqwest::RedirectPolicy::none())
             .build()
@@ -149,11 +149,11 @@ impl EpitechClientBuilder {
 
 impl EpitechClient {
     #[inline]
-    fn builder() -> EpitechClientBuilder {
+    pub fn builder() -> EpitechClientBuilder {
         EpitechClientBuilder::new()
     }
 
-    fn make_request<T: ToString>(&self, url: T) -> Option<String> {
+    pub fn make_request<T: ToString>(&self, url: T) -> Option<String> {
         let mut string = url.to_string();
         if !string.contains("&format=json") && !string.contains("?format=json") {
             let b = string.contains("?");
@@ -170,41 +170,41 @@ impl EpitechClient {
             .ok()
     }
 
-    fn fetch_student_list(&self) -> StudentListFetchBuilder {
+    pub fn fetch_student_list(&self) -> StudentListFetchBuilder {
         StudentListFetchBuilder::new().client(self.clone())
     }
 
-    fn fetch_student_data(&self) -> StudentDataFetchBuilder {
+    pub fn fetch_student_data(&self) -> StudentDataFetchBuilder {
         StudentDataFetchBuilder::new().client(self.clone())
     }
 
-    fn fetch_student_netsoul<'a>(&self, login: &'a str) -> Option<Vec<response::UserNetsoulEntry>> {
+    pub fn fetch_student_netsoul<'a>(&self, login: &'a str) -> Option<Vec<response::UserNetsoulEntry>> {
         let url = format!("/user/{}/netsoul", login);
         self.make_request(url)
             .and_then(|text| serde_json::from_str(&text).ok())
     }
 
-    fn fetch_own_student_netsoul(&self) -> Option<Vec<response::UserNetsoulEntry>> {
+    pub fn fetch_own_student_netsoul(&self) -> Option<Vec<response::UserNetsoulEntry>> {
         self.fetch_student_netsoul(self.login.as_ref())
     }
 
-    fn fetch_student_notes<'a>(&self, login: &'a str) -> Option<response::UserNotes> {
+    pub fn fetch_student_notes<'a>(&self, login: &'a str) -> Option<response::UserNotes> {
         let url = format!("/user/{}/notes", login);
         self.make_request(url)
             .and_then(|text| serde_json::from_str(&text).ok())
     }
 
-    fn fetch_own_student_notes(&self) -> Option<response::UserNotes> {
+    pub fn fetch_own_student_notes(&self) -> Option<response::UserNotes> {
         self.fetch_student_notes(self.login.as_ref())
     }
 
-    fn fetch_student_binomes<'a>(&self, login: &'a str) -> Option<response::UserBinome> {
+    pub fn fetch_student_binomes<'a>(&self, login: &'a str) -> Option<response::UserBinome> {
         let url = format!("/user/{}/binome", login);
         self.make_request(url)
             .and_then(|text| serde_json::from_str(&text).ok())
     }
 
-    fn fetch_own_student_binomes(&self) -> Option<response::UserBinome> {
+    pub fn fetch_own_student_binomes(&self) -> Option<response::UserBinome> {
         self.fetch_student_binomes(self.login.as_ref())
     }
 }
@@ -222,7 +222,7 @@ impl Default for EpitechClient {
 
 impl StudentListFetchBuilder {
     #[inline]
-    fn new() -> StudentListFetchBuilder {
+    pub fn new() -> StudentListFetchBuilder {
         StudentListFetchBuilder {
             client: EpitechClient::default(),
             location: None,
@@ -234,7 +234,7 @@ impl StudentListFetchBuilder {
         }
     }
 
-    fn send(self) -> Option<Vec<response::UserEntry>> {
+    pub fn send(self) -> Option<Vec<response::UserEntry>> {
         let mut url = String::from(format!("/user/filter/user?offset={}", self.offset));
         match self.location {
             Some(ref location) => url.push_str(format!("&location={}", location).as_ref()),
@@ -258,43 +258,43 @@ impl StudentListFetchBuilder {
     }
 
     #[inline]
-    fn client(mut self, client: EpitechClient) -> StudentListFetchBuilder {
+    pub fn client(mut self, client: EpitechClient) -> StudentListFetchBuilder {
         self.client = client;
         self
     }
 
     #[inline]
-    fn location(mut self, location: Location) -> StudentListFetchBuilder {
+    pub fn location(mut self, location: Location) -> StudentListFetchBuilder {
         self.location = Some(location);
         self
     }
 
     #[inline]
-    fn active(mut self, active: bool) -> StudentListFetchBuilder {
+    pub fn active(mut self, active: bool) -> StudentListFetchBuilder {
         self.active = active;
         self
     }
 
     #[inline]
-    fn offset(mut self, offset: u32) -> StudentListFetchBuilder {
+    pub fn offset(mut self, offset: u32) -> StudentListFetchBuilder {
         self.offset = offset;
         self
     }
 
     #[inline]
-    fn year(mut self, year: u32) -> StudentListFetchBuilder {
+    pub fn year(mut self, year: u32) -> StudentListFetchBuilder {
         self.year = year;
         self
     }
 
     #[inline]
-    fn promo(mut self, promo: Promo) -> StudentListFetchBuilder {
+    pub fn promo(mut self, promo: Promo) -> StudentListFetchBuilder {
         self.promo = Some(promo);
         self
     }
 
     #[inline]
-    fn course<T: Into<String>>(mut self, course: T) -> StudentListFetchBuilder {
+    pub fn course<T: Into<String>>(mut self, course: T) -> StudentListFetchBuilder {
         self.course = course.into();
         self
     }
@@ -302,14 +302,14 @@ impl StudentListFetchBuilder {
 
 impl StudentDataFetchBuilder {
     #[inline]
-    fn new() -> StudentDataFetchBuilder {
+    pub fn new() -> StudentDataFetchBuilder {
         StudentDataFetchBuilder {
             client: EpitechClient::default(),
             login: None,
         }
     }
 
-    fn send(self) -> Option<response::UserData> {
+    pub fn send(self) -> Option<response::UserData> {
         let url = self.login
             .as_ref()
             .map(|login| format!("/user/{}", login))
@@ -320,13 +320,13 @@ impl StudentDataFetchBuilder {
     }
 
     #[inline]
-    fn client<'a>(mut self, client: EpitechClient) -> StudentDataFetchBuilder {
+    pub fn client<'a>(mut self, client: EpitechClient) -> StudentDataFetchBuilder {
         self.client = client;
         self
     }
 
     #[inline]
-    fn login<T: Into<String>>(mut self, login: T) -> StudentDataFetchBuilder {
+    pub fn login<T: Into<String>>(mut self, login: T) -> StudentDataFetchBuilder {
         self.login = Some(login.into());
         self
     }
