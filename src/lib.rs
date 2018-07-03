@@ -11,14 +11,18 @@ extern crate serde_derive;
 extern crate lazy_static;
 
 mod constants;
+pub mod error;
 pub mod response;
+
+use std::default::Default;
+use std::fmt::Display;
+use std::str::FromStr;
 
 use chrono::prelude::*;
 use reqwest::header;
 use serde::{de::Visitor, Deserialize, Deserializer, Serialize, Serializer};
-use std::default::Default;
-use std::fmt::Display;
-use std::str::FromStr;
+
+use error::EpitechClientError;
 
 #[derive(Debug, Clone)]
 pub struct EpitechClientBuilder {
@@ -83,14 +87,6 @@ struct UserEntries {
     pub items: Vec<response::UserEntry>,
 }
 
-#[derive(Debug, Clone, Eq, Ord, PartialEq, PartialOrd)]
-pub enum Error {
-    InvalidStatusCode(u16),
-    CookieNotFound,
-    UnreachableRemote,
-    InternalError,
-}
-
 impl EpitechClientBuilder {
     pub fn new() -> EpitechClientBuilder {
         EpitechClientBuilder {
@@ -111,13 +107,13 @@ impl EpitechClientBuilder {
         self
     }
 
-    pub fn authenticate(self) -> Result<EpitechClient, Error> {
+    pub fn authenticate(self) -> Result<EpitechClient, EpitechClientError> {
         let client = match reqwest::Client::builder()
             .redirect(reqwest::RedirectPolicy::none())
             .build()
         {
             Ok(x) => x,
-            Err(_) => return Err(Error::InternalError),
+            Err(_) => return Err(EpitechClientError::InternalError),
         };
         match client.get(&self.autologin).send() {
             Ok(resp) => match resp.headers().get::<header::SetCookie>() {
@@ -138,25 +134,25 @@ impl EpitechClientBuilder {
                         retry_count: self.retry_count,
                         client: match reqwest::Client::builder().default_headers(headers).build() {
                             Ok(x) => x,
-                            Err(_) => return Err(Error::InternalError),
+                            Err(_) => return Err(EpitechClientError::InternalError),
                         },
                         login: String::default(),
                     };
                     match client.fetch_student_data().send() {
-                        Some(data) => {
+                        Ok(data) => {
                             client.login = data.login.clone();
                             Ok(client)
                         }
-                        None => Err(Error::InternalError),
+                        Err(err) => Err(err),
                     }
                 }
-                None => Err(Error::CookieNotFound),
+                None => Err(EpitechClientError::CookieNotFound),
             },
             Err(err) => {
                 let status = err.status();
                 match status {
-                    Some(status) => Err(Error::InvalidStatusCode(status.as_u16())),
-                    None => Err(Error::UnreachableRemote),
+                    Some(status) => Err(EpitechClientError::InvalidStatusCode(status.as_u16())),
+                    None => Err(EpitechClientError::UnreachableRemote),
                 }
             }
         }
@@ -169,7 +165,7 @@ impl EpitechClient {
         EpitechClientBuilder::new()
     }
 
-    pub fn make_request<T: ToString>(&self, url: T) -> Option<String> {
+    pub fn make_request<T: ToString>(&self, url: T) -> Result<String, EpitechClientError> {
         let mut string = url.to_string();
         if !string.contains("&format=json") && !string.contains("?format=json") {
             let b = string.contains("?");
@@ -183,13 +179,12 @@ impl EpitechClient {
             let ret = self.client
                 .get(&string)
                 .send()
-                .and_then(|mut val| val.text())
-                .ok();
-            if ret.is_some() {
-                return ret;
+                .and_then(|mut val| val.text());
+            if ret.is_ok() {
+                return ret.map_err(|err| err.into());
             }
         }
-        None
+        Err(EpitechClientError::RetryLimit)
     }
 
     pub fn fetch_student_list(&self) -> StudentListFetchBuilder {
@@ -203,33 +198,41 @@ impl EpitechClient {
     pub fn fetch_student_netsoul<'a>(
         &self,
         login: &'a str,
-    ) -> Option<Vec<response::UserNetsoulEntry>> {
+    ) -> Result<Vec<response::UserNetsoulEntry>, EpitechClientError> {
         let url = format!("/user/{}/netsoul", login);
         self.make_request(url)
-            .and_then(|text| serde_json::from_str(&text).ok())
+            .and_then(|text| serde_json::from_str(&text).map_err(|err| err.into()))
     }
 
-    pub fn fetch_own_student_netsoul(&self) -> Option<Vec<response::UserNetsoulEntry>> {
+    pub fn fetch_own_student_netsoul(
+        &self,
+    ) -> Result<Vec<response::UserNetsoulEntry>, EpitechClientError> {
         self.fetch_student_netsoul(self.login.as_ref())
     }
 
-    pub fn fetch_student_notes<'a>(&self, login: &'a str) -> Option<response::UserNotes> {
+    pub fn fetch_student_notes<'a>(
+        &self,
+        login: &'a str,
+    ) -> Result<response::UserNotes, EpitechClientError> {
         let url = format!("/user/{}/notes", login);
         self.make_request(url)
-            .and_then(|text| serde_json::from_str(&text).ok())
+            .and_then(|text| serde_json::from_str(&text).map_err(|err| err.into()))
     }
 
-    pub fn fetch_own_student_notes(&self) -> Option<response::UserNotes> {
+    pub fn fetch_own_student_notes(&self) -> Result<response::UserNotes, EpitechClientError> {
         self.fetch_student_notes(self.login.as_ref())
     }
 
-    pub fn fetch_student_binomes<'a>(&self, login: &'a str) -> Option<response::UserBinome> {
+    pub fn fetch_student_binomes<'a>(
+        &self,
+        login: &'a str,
+    ) -> Result<response::UserBinome, EpitechClientError> {
         let url = format!("/user/{}/binome", login);
         self.make_request(url)
-            .and_then(|text| serde_json::from_str(&text).ok())
+            .and_then(|text| serde_json::from_str(&text).map_err(|err| err.into()))
     }
 
-    pub fn fetch_own_student_binomes(&self) -> Option<response::UserBinome> {
+    pub fn fetch_own_student_binomes(&self) -> Result<response::UserBinome, EpitechClientError> {
         self.fetch_student_binomes(self.login.as_ref())
     }
 }
@@ -260,7 +263,7 @@ impl StudentListFetchBuilder {
         }
     }
 
-    pub fn send(self) -> Option<Vec<response::UserEntry>> {
+    pub fn send(self) -> Result<Vec<response::UserEntry>, EpitechClientError> {
         let mut url = String::from(format!("/user/filter/user?offset={}", self.offset));
         match self.location {
             Some(ref location) => url.push_str(format!("&location={}", location).as_ref()),
@@ -275,13 +278,13 @@ impl StudentListFetchBuilder {
         url.push_str(format!("&active={}", self.active).as_ref());
         self.client
             .make_request(&url)
-            .and_then(|text| serde_json::from_str::<UserEntries>(&text).ok())
+            .and_then(|text| serde_json::from_str::<UserEntries>(&text).map_err(|err| err.into()))
             .and_then(|mut v| {
                 let state: usize = (self.offset as usize) + v.items.len();
                 if state == v.total {
-                    Some(v.items)
+                    Ok(v.items)
                 } else if state >= v.total {
-                    None
+                    Err(EpitechClientError::InternalError)
                 } else {
                     self.offset(state as u32).send().map(|mut x| {
                         v.items.append(&mut x);
@@ -343,14 +346,14 @@ impl StudentDataFetchBuilder {
         }
     }
 
-    pub fn send(self) -> Option<response::UserData> {
+    pub fn send(self) -> Result<response::UserData, EpitechClientError> {
         let url = self.login
             .as_ref()
             .map(|login| format!("/user/{}", login))
             .unwrap_or_else(|| String::from("/user"));
         self.client
             .make_request(url)
-            .and_then(|text| serde_json::from_str(&text).ok())
+            .and_then(|text| serde_json::from_str(&text).map_err(|err| err.into()))
     }
 
     #[inline]
@@ -465,7 +468,7 @@ mod tests {
     use super::*;
     use std::io::Read;
 
-    fn get_client() -> Result<EpitechClient, Error> {
+    fn get_client() -> Result<EpitechClient, EpitechClientError> {
         let mut contents = String::default();
         std::fs::File::open("test-config.json")
             .unwrap()
@@ -489,7 +492,7 @@ mod tests {
         let ret = EpitechClient::builder().autologin("toto").authenticate();
         assert!(ret.is_err());
         let api = ret.unwrap_err();
-        assert!(api == Error::UnreachableRemote);
+        assert!(api == EpitechClientError::UnreachableRemote);
     }
 
     #[test]
@@ -508,7 +511,7 @@ mod tests {
             .promo(Promo::Tek2)
             .year(2017)
             .send();
-        assert!(list.is_some());
+        assert!(list.is_ok());
     }
 
     #[test]
@@ -537,7 +540,7 @@ mod tests {
         assert!(ret.is_ok());
         let api = ret.unwrap();
         let list = api.fetch_student_data().send();
-        assert!(list.is_some());
+        assert!(list.is_ok());
     }
 
     #[test]
@@ -548,7 +551,7 @@ mod tests {
         let list = api.fetch_student_data()
             .login("nicolas.polomack@epitech.eu")
             .send();
-        assert!(list.is_some());
+        assert!(list.is_ok());
     }
 
     // #[test]
@@ -566,7 +569,7 @@ mod tests {
         assert!(ret.is_ok());
         let api = ret.unwrap();
         let list = api.fetch_student_netsoul("nicolas.polomack@epitech.eu");
-        assert!(list.is_some());
+        assert!(list.is_ok());
     }
 
     #[test]
@@ -575,7 +578,7 @@ mod tests {
         assert!(ret.is_ok());
         let api = ret.unwrap();
         let list = api.fetch_student_notes("nicolas.polomack@epitech.eu");
-        assert!(list.is_some());
+        assert!(list.is_ok());
     }
 
     #[test]
@@ -584,6 +587,6 @@ mod tests {
         assert!(ret.is_ok());
         let api = ret.unwrap();
         let list = api.fetch_student_binomes("nicolas.polomack@epitech.eu");
-        assert!(list.is_some());
+        assert!(list.is_ok());
     }
 }
