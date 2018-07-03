@@ -23,11 +23,13 @@ use std::str::FromStr;
 #[derive(Debug, Clone)]
 pub struct EpitechClientBuilder {
     autologin: String,
+    retry_count: u32,
 }
 
 #[derive(Debug, Clone)]
 pub struct EpitechClient {
     autologin: String,
+    retry_count: u32,
     client: reqwest::Client,
     login: String,
 }
@@ -93,12 +95,19 @@ impl EpitechClientBuilder {
     pub fn new() -> EpitechClientBuilder {
         EpitechClientBuilder {
             autologin: String::default(),
+            retry_count: 5,
         }
     }
 
     #[inline]
     pub fn autologin<'a, T: Into<String>>(mut self, autologin: T) -> EpitechClientBuilder {
         self.autologin = autologin.into();
+        self
+    }
+
+    #[inline]
+    pub fn retry_count(mut self, retry_count: u32) -> EpitechClientBuilder {
+        self.retry_count = retry_count;
         self
     }
 
@@ -126,6 +135,7 @@ impl EpitechClientBuilder {
                     headers.set(new_cookie);
                     let mut client = EpitechClient {
                         autologin: self.autologin.clone(),
+                        retry_count: self.retry_count,
                         client: match reqwest::Client::builder().default_headers(headers).build() {
                             Ok(x) => x,
                             Err(_) => return Err(Error::InternalError),
@@ -169,11 +179,17 @@ impl EpitechClient {
         if !string.starts_with(constants::ENDPOINT) {
             string.insert_str(0, constants::ENDPOINT);
         }
-        self.client
-            .get(&string)
-            .send()
-            .and_then(|mut val| val.text())
-            .ok()
+        for _ in 0..self.retry_count {
+            let ret = self.client
+                .get(&string)
+                .send()
+                .and_then(|mut val| val.text())
+                .ok();
+            if ret.is_some() {
+                return ret;
+            }
+        }
+        None
     }
 
     pub fn fetch_student_list(&self) -> StudentListFetchBuilder {
@@ -223,6 +239,7 @@ impl Default for EpitechClient {
     fn default() -> EpitechClient {
         EpitechClient {
             autologin: String::default(),
+            retry_count: 5,
             client: reqwest::Client::new(),
             login: String::default(),
         }
