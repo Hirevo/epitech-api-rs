@@ -18,13 +18,13 @@ pub enum EpitechClientError {
 
 impl From<serde_json::Error> for EpitechClientError {
     fn from(v: serde_json::Error) -> EpitechClientError {
-        EpitechClientError::ParserError(String::from(v.description()))
+        EpitechClientError::ParserError(v.to_string())
     }
 }
 
 impl From<reqwest::Error> for EpitechClientError {
     fn from(v: reqwest::Error) -> EpitechClientError {
-        EpitechClientError::RequestError(String::from(v.description()))
+        EpitechClientError::RequestError(v.to_string())
     }
 }
 
