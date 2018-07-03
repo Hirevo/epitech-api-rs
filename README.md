@@ -19,18 +19,18 @@ You can create an `EpitechClient` this way:
 ```rust
 let result = EpitechClient::builder()
     .autologin("[INSERT AUTOLOGIN LINK HERE]")
-    .authenticate(); // This returns a `Result<EpitechClient, Error>`.
+    .authenticate(); // This returns a `Result<EpitechClient, EpitechClientError>`.
 
 let client = match result {
-    Some(client) => client,
-    None => , // Handle authentication error here.
+    Ok(client) => client,
+    Err(err) => , // Handle authentication error here.
 };
 ```
 Right after this, you're already authenticated to the intranet and ready to proceed with requests.
 
 You can, for instance, request the list of all students in a promotion this way:
 ```rust
-// This makes the request and returns a `Option<Vec<UserEntry>>`.
+// This makes the request and returns a `Result<Vec<UserEntry>, EpitechClientError>`.
 let result = api.fetch_student_list()
     .location(Location::Strasbourg)
     .promo(Promo::Tek2)
@@ -42,7 +42,7 @@ let result = api.fetch_student_list()
 ```rust
 // Notice that only the path component of the route can be passed to the method.
 let my_student_infos = match client.make_request("/user") {
-    Some(text) => , // Here, `text` represents the raw intranet response body.
-    None => , // Handle request error here.
+    Ok(text) => , // Here, `text` represents the raw intranet response body.
+    Err(err) => , // Handle request error here.
 };
 ```
