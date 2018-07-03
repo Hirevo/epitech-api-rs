@@ -589,4 +589,47 @@ mod tests {
         let list = api.fetch_student_binomes("nicolas.polomack@epitech.eu");
         assert!(list.is_ok());
     }
+
+    #[test]
+    fn fetch_all_gpas() {
+        let client = get_client().unwrap();
+        let list = client
+            .fetch_student_list()
+            .promo(Promo::Tek2)
+            .location(Location::Strasbourg)
+            .year(2017)
+            .send()
+            .unwrap();
+        let data: Vec<(String, String, String, f32)> = list.iter()
+            .map(|elem| {
+                let ret = client
+                    .fetch_student_data()
+                    .login(elem.login.as_ref())
+                    .send();
+                if let Err(err) = &ret {
+                    println!("GPA Fetch: {} [{}]", elem.login, err);
+                }
+                ret
+            })
+            .filter(|ret| ret.is_ok())
+            .map(|ret| ret.unwrap())
+            .map(|data| {
+                (
+                    data.firstname,
+                    data.lastname,
+                    data.login,
+                    data.gpa
+                        .expect("No GPA field.")
+                        .get(0)
+                        .expect("No GPA elements.")
+                        .gpa
+                        .parse()
+                        .expect("Can't map GPA to a float."),
+                )
+            })
+            .collect();
+        for (firstname, lastname, login, gpa) in data {
+            println!("{} {} [{}]: {}", firstname, lastname, login, gpa);
+        }
+    }
 }

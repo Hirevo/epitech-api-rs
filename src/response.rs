@@ -47,8 +47,10 @@ pub struct UserDataGPA {
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct UserDataSpice {
-    pub available_spice: String,
-    pub consumed_spice: u32,
+    #[serde(default)]
+    pub available_spice: Option<String>,
+    #[serde(default)]
+    pub consumed_spice: Option<u32>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
