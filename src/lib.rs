@@ -176,7 +176,8 @@ impl EpitechClient {
             string.insert_str(0, constants::ENDPOINT);
         }
         for _ in 0..self.retry_count {
-            let ret = self.client
+            let ret = self
+                .client
                 .get(&string)
                 .send()
                 .and_then(|mut val| val.text());
@@ -234,6 +235,12 @@ impl EpitechClient {
 
     pub fn fetch_own_student_binomes(&self) -> Result<response::UserBinome, EpitechClientError> {
         self.fetch_student_binomes(self.login.as_ref())
+    }
+
+    pub fn search_student(&self, login: &str) -> Result<Vec<response::UserSearchResultEntry>, EpitechClientError> {
+        let url = format!("/complete/user?format=json&contains&search={}", login);
+        self.make_request(url)
+            .and_then(|text| serde_json::from_str(&text).map_err(|err| err.into()))
     }
 }
 
@@ -347,7 +354,8 @@ impl StudentDataFetchBuilder {
     }
 
     pub fn send(self) -> Result<response::UserData, EpitechClientError> {
-        let url = self.login
+        let url = self
+            .login
             .as_ref()
             .map(|login| format!("/user/{}", login))
             .unwrap_or_else(|| String::from("/user"));
@@ -506,7 +514,8 @@ mod tests {
         let ret = get_client();
         assert!(ret.is_ok());
         let api = ret.unwrap();
-        let list = api.fetch_student_list()
+        let list = api
+            .fetch_student_list()
             .location(Location::Strasbourg)
             .promo(Promo::Tek2)
             .year(2017)
@@ -523,7 +532,8 @@ mod tests {
         for promo in constants::PROMO_TABLE.iter() {
             for location in constants::LOCATION_TABLE.iter() {
                 println!("{} {}", promo.0, location.0);
-                let ret = api.fetch_student_list()
+                let ret = api
+                    .fetch_student_list()
                     .location(location.0.clone())
                     .promo(promo.0.clone())
                     .year(2017)
@@ -548,7 +558,8 @@ mod tests {
         let ret = get_client();
         assert!(ret.is_ok());
         let api = ret.unwrap();
-        let list = api.fetch_student_data()
+        let list = api
+            .fetch_student_data()
             .login("nicolas.polomack@epitech.eu")
             .send();
         assert!(list.is_ok());
@@ -590,7 +601,7 @@ mod tests {
         assert!(list.is_ok());
     }
 
-    #[test]
+    // #[test]
     fn fetch_all_gpas() {
         let client = get_client().unwrap();
         let list = client
@@ -600,7 +611,8 @@ mod tests {
             .year(2017)
             .send()
             .unwrap();
-        let data: Vec<(String, String, String, f32)> = list.iter()
+        let data: Vec<(String, String, String, f32)> = list
+            .iter()
             .map(|elem| {
                 let ret = client
                     .fetch_student_data()
@@ -631,5 +643,13 @@ mod tests {
         for (firstname, lastname, login, gpa) in data {
             println!("{} {} [{}]: {}", firstname, lastname, login, gpa);
         }
+    }
+
+    #[test]
+    fn search_student() {
+        let client = get_client().unwrap();
+        let ret = client.search_student("nicolas.poloma");
+        assert!(ret.is_ok());
+        println!("{:?}", ret.unwrap());
     }
 }

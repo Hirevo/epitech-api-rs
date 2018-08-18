@@ -172,3 +172,16 @@ pub struct UserBinomeEntry {
     pub nb_activities: String,
     pub weight: String,
 }
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct UserSearchResultEntry {
+    pub title: Option<String>,
+    #[serde(rename = "type")]
+    pub user_type: String,
+    pub login: String,
+    pub picture_fun: Option<String>,
+    pub picture: Option<String>,
+    pub course_code: Option<String>,
+    pub promo: Option<String>,
+    pub course: Option<String>,
+}
