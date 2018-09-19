@@ -237,8 +237,25 @@ impl EpitechClient {
         self.fetch_student_binomes(self.login.as_ref())
     }
 
-    pub fn search_student(&self, login: &str) -> Result<Vec<response::UserSearchResultEntry>, EpitechClientError> {
+    pub fn search_student(
+        &self,
+        login: &str,
+    ) -> Result<Vec<response::UserSearchResultEntry>, EpitechClientError> {
         let url = format!("/complete/user?format=json&contains&search={}", login);
+        self.make_request(url)
+            .and_then(|text| serde_json::from_str(&text).map_err(|err| err.into()))
+    }
+
+    pub fn fetch_available_courses(
+        &self,
+        location: Location,
+        year: u32,
+        active: bool,
+    ) -> Result<Vec<response::AvailableCourseEntry>, EpitechClientError> {
+        let url = format!(
+            "/user/filter/course?format=json&location={}&year={}&active={}",
+            location, year, active
+        );
         self.make_request(url)
             .and_then(|text| serde_json::from_str(&text).map_err(|err| err.into()))
     }
@@ -518,7 +535,7 @@ mod tests {
             .fetch_student_list()
             .location(Location::Strasbourg)
             .promo(Promo::Tek2)
-            .year(2017)
+            .year(2018)
             .send();
         assert!(list.is_ok());
     }
@@ -651,5 +668,14 @@ mod tests {
         let ret = client.search_student("nicolas.poloma");
         assert!(ret.is_ok());
         println!("{:?}", ret.unwrap());
+    }
+
+    #[test]
+    fn fetch_available_courses() {
+        let ret = get_client();
+        assert!(ret.is_ok());
+        let api = ret.unwrap();
+        let list = api.fetch_available_courses(Location::Strasbourg, 2018, true);
+        assert!(list.is_ok());
     }
 }

@@ -185,3 +185,12 @@ pub struct UserSearchResultEntry {
     pub promo: Option<String>,
     pub course: Option<String>,
 }
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct AvailableCourseEntry {
+    pub students: String,
+    pub code: String,
+    pub shortcode_school: String,
+    pub title: String,
+    pub old_title: String,
+}
