@@ -194,3 +194,10 @@ pub struct AvailableCourseEntry {
     pub title: String,
     pub old_title: String,
 }
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct AvailablePromoEntry {
+    pub students: String,
+    pub promo: String,
+    pub promo_deprecated: String,
+}

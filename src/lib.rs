@@ -38,7 +38,7 @@ pub struct EpitechClient {
     login: String,
 }
 
-#[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Eq, Ord, Hash)]
 pub enum Location {
     Bordeaux,
     LaReunion,
@@ -57,7 +57,7 @@ pub enum Location {
     Barcelone,
 }
 
-#[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Eq, Ord, Hash)]
 pub enum Promo {
     Tek1,
     Tek2,
@@ -259,6 +259,21 @@ impl EpitechClient {
         self.make_request(url)
             .and_then(|text| serde_json::from_str(&text).map_err(|err| err.into()))
     }
+
+    pub fn fetch_available_promos(
+        &self,
+        location: Location,
+        year: u32,
+        course: &str,
+        active: bool,
+    ) -> Result<Vec<response::AvailablePromoEntry>, EpitechClientError> {
+        let url = format!(
+            "/user/filter/promo?format=json&location={}&year={}&course={}&active={}",
+            location, year, course, active
+        );
+        self.make_request(url)
+            .and_then(|text| serde_json::from_str(&text).map_err(|err| err.into()))
+    }
 }
 
 impl Default for EpitechClient {
@@ -288,15 +303,13 @@ impl StudentListFetchBuilder {
     }
 
     pub fn send(self) -> Result<Vec<response::UserEntry>, EpitechClientError> {
-        let mut url = String::from(format!("/user/filter/user?offset={}", self.offset));
-        match self.location {
-            Some(ref location) => url.push_str(format!("&location={}", location).as_ref()),
-            None => {}
-        };
-        match self.promo {
-            Some(ref promo) => url.push_str(format!("&promo={}", promo).as_ref()),
-            None => {}
-        };
+        let mut url = format!("/user/filter/user?offset={}", self.offset);
+        if let Some(ref location) = self.location {
+            url.push_str(format!("&location={}", location).as_ref());
+        }
+        if let Some(ref promo) = self.promo {
+            url.push_str(format!("&promo={}", promo).as_ref());
+        }
         url.push_str(format!("&year={}", self.year).as_ref());
         url.push_str(format!("&course={}", self.course).as_ref());
         url.push_str(format!("&active={}", self.active).as_ref());
@@ -449,7 +462,7 @@ impl FromStr for Location {
     fn from_str(string: &str) -> Result<Self, Self::Err> {
         for it in constants::LOCATION_TABLE.iter() {
             if string == *it.1 {
-                return Ok(it.0.clone());
+                return Ok(*it.0);
             }
         }
         Err(())
@@ -471,7 +484,7 @@ impl FromStr for Promo {
     fn from_str(string: &str) -> Result<Self, Self::Err> {
         for it in constants::PROMO_TABLE.iter() {
             if string == *it.1 {
-                return Ok(it.0.clone());
+                return Ok(*it.0);
             }
         }
         Err(())
@@ -551,8 +564,8 @@ mod tests {
                 println!("{} {}", promo.0, location.0);
                 let ret = api
                     .fetch_student_list()
-                    .location(location.0.clone())
-                    .promo(promo.0.clone())
+                    .location(*location.0)
+                    .promo(*promo.0)
                     .year(2017)
                     .send();
                 list.append(&mut ret.unwrap_or(Vec::default()));
@@ -639,8 +652,7 @@ mod tests {
                     println!("GPA Fetch: {} [{}]", elem.login, err);
                 }
                 ret
-            })
-            .filter(|ret| ret.is_ok())
+            }).filter(|ret| ret.is_ok())
             .map(|ret| ret.unwrap())
             .map(|data| {
                 (
@@ -655,8 +667,7 @@ mod tests {
                         .parse()
                         .expect("Can't map GPA to a float."),
                 )
-            })
-            .collect();
+            }).collect();
         for (firstname, lastname, login, gpa) in data {
             println!("{} {} [{}]: {}", firstname, lastname, login, gpa);
         }
