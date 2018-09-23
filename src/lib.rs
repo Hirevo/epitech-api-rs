@@ -122,7 +122,7 @@ impl EpitechClientBuilder {
                     let mut new_cookie = header::Cookie::new();
                     for it in cookie.iter() {
                         if it.starts_with("user=") {
-                            let whole = it.split(";").nth(0).unwrap();
+                            let whole = it.split(';').nth(0).unwrap();
                             let name = String::from(&whole[0..4]);
                             let value = String::from(&whole[5..]);
                             new_cookie.append(name, value);
