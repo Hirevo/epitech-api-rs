@@ -26,10 +26,8 @@ pub struct UserDataInfo {
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct UserDataInfoFields {
     pub value: String,
-    #[serde(default)]
-    pub adm: bool,
-    #[serde(default)]
-    pub public: bool,
+    pub adm: Option<bool>,
+    pub public: Option<bool>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -47,19 +45,17 @@ pub struct UserDataGPA {
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct UserDataSpice {
-    #[serde(default)]
     pub available_spice: Option<String>,
-    #[serde(default)]
     pub consumed_spice: Option<u32>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct UserDataNsStat {
-    pub active: u32,
-    pub idle: u32,
-    pub out_active: u32,
-    pub out_idle: u32,
-    pub nslog_norm: u32,
+    pub active: f32,
+    pub idle: f32,
+    pub out_active: f32,
+    pub out_idle: f32,
+    pub nslog_norm: f32,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -74,9 +70,7 @@ pub struct UserData {
     pub picture: String,
     pub picture_fun: Option<String>,
     pub scolaryear: Option<String>,
-    #[serde(default)]
     pub promo: Option<u32>,
-    #[serde(default)]
     pub semester: Option<u32>,
     pub location: String,
     pub documents: Option<String>,
@@ -85,7 +79,6 @@ pub struct UserData {
     pub close: bool,
     pub ctime: String,
     pub mtime: String,
-    #[serde(default)]
     pub id_promo: Option<String>,
     pub id_history: Option<String>,
     pub course_code: Option<String>,
@@ -97,20 +90,14 @@ pub struct UserData {
     pub old_id_location: Option<String>,
     pub rights: serde_json::Value,
     pub invited: bool,
-    #[serde(default)]
     pub studentyear: Option<u32>,
     pub admin: bool,
     pub editable: bool,
     pub groups: Vec<UserDataGroup>,
-    #[serde(default)]
     pub events: Option<Vec<serde_json::Value>>,
-    #[serde(default)]
     pub credits: Option<u32>,
-    #[serde(default)]
     pub gpa: Option<Vec<UserDataGPA>>,
-    #[serde(default)]
     pub spice: Option<UserDataSpice>,
-    #[serde(default)]
     pub nsstat: Option<UserDataNsStat>,
 }
 
@@ -125,16 +112,16 @@ pub struct UserNotes {
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct UserNotesModule {
-    pub scolaryear: u32,
-    pub id_user_history: String,
-    pub codemodule: String,
-    pub codeinstance: String,
-    pub title: String,
-    pub date_ins: String,
-    pub cycle: String,
-    pub grade: String,
-    pub credits: f32,
-    pub barrage: u32,
+    pub scolaryear: Option<u32>,
+    pub id_user_history: Option<String>,
+    pub codemodule: Option<String>,
+    pub codeinstance: Option<String>,
+    pub title: Option<String>,
+    pub date_ins: Option<String>,
+    pub cycle: Option<String>,
+    pub grade: Option<String>,
+    pub credits: Option<f32>,
+    pub barrage: Option<u32>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]

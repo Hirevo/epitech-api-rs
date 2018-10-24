@@ -116,38 +116,42 @@ impl EpitechClientBuilder {
             Err(_) => return Err(EpitechClientError::InternalError),
         };
         match client.get(&self.autologin).send() {
-            Ok(resp) => match resp.headers().get::<header::SetCookie>() {
-                Some(cookie) => {
-                    let mut headers = header::Headers::new();
-                    let mut new_cookie = header::Cookie::new();
-                    for it in cookie.iter() {
-                        if it.starts_with("user=") {
-                            let whole = it.split(';').nth(0).unwrap();
-                            let name = String::from(&whole[0..4]);
-                            let value = String::from(&whole[5..]);
-                            new_cookie.append(name, value);
+            Ok(resp) => {
+                let opt = resp
+                    .headers()
+                    .get_all(header::SET_COOKIE)
+                    .iter()
+                    .filter_map(|it| it.to_str().ok())
+                    .find(|cookie| cookie.starts_with("user="))
+                    .and_then(|cookie| cookie.split(';').nth(0))
+                    .and_then(|cookie| header::HeaderValue::from_str(cookie).ok());
+                match opt {
+                    Some(cookie) => {
+                        let mut headers = header::HeaderMap::new();
+                        headers.insert(header::COOKIE, cookie);
+                        let mut client = EpitechClient {
+                            autologin: self.autologin.clone(),
+                            retry_count: self.retry_count,
+                            client: match reqwest::Client::builder()
+                                .default_headers(headers)
+                                .build()
+                            {
+                                Ok(x) => x,
+                                Err(_) => return Err(EpitechClientError::InternalError),
+                            },
+                            login: String::default(),
+                        };
+                        match client.fetch_student_data().send() {
+                            Ok(data) => {
+                                client.login = data.login.clone();
+                                Ok(client)
+                            }
+                            Err(err) => Err(err),
                         }
                     }
-                    headers.set(new_cookie);
-                    let mut client = EpitechClient {
-                        autologin: self.autologin.clone(),
-                        retry_count: self.retry_count,
-                        client: match reqwest::Client::builder().default_headers(headers).build() {
-                            Ok(x) => x,
-                            Err(_) => return Err(EpitechClientError::InternalError),
-                        },
-                        login: String::default(),
-                    };
-                    match client.fetch_student_data().send() {
-                        Ok(data) => {
-                            client.login = data.login.clone();
-                            Ok(client)
-                        }
-                        Err(err) => Err(err),
-                    }
+                    None => Err(EpitechClientError::CookieNotFound),
                 }
-                None => Err(EpitechClientError::CookieNotFound),
-            },
+            }
             Err(err) => {
                 let status = err.status();
                 match status {
@@ -389,9 +393,10 @@ impl StudentDataFetchBuilder {
             .as_ref()
             .map(|login| format!("/user/{}", login))
             .unwrap_or_else(|| String::from("/user"));
-        self.client
-            .make_request(url)
-            .and_then(|text| serde_json::from_str(&text).map_err(|err| err.into()))
+        self.client.make_request(url).and_then(|text| {
+            println!("{}", text);
+            serde_json::from_str(&text).map_err(|err| { println!("{}", err); err.into()})
+        })
     }
 
     #[inline]
