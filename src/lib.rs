@@ -393,10 +393,9 @@ impl StudentDataFetchBuilder {
             .as_ref()
             .map(|login| format!("/user/{}", login))
             .unwrap_or_else(|| String::from("/user"));
-        self.client.make_request(url).and_then(|text| {
-            println!("{}", text);
-            serde_json::from_str(&text).map_err(|err| { println!("{}", err); err.into()})
-        })
+        self.client
+            .make_request(url)
+            .and_then(|text| serde_json::from_str(&text).map_err(|err| err.into()))
     }
 
     #[inline]
