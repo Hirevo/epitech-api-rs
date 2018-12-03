@@ -321,7 +321,6 @@ impl StudentListFetchBuilder {
             url.push_str(format!("&course={}", course).as_ref());
         }
         url.push_str(format!("&active={}", self.active).as_ref());
-        println!("URI: {}", url);
         self.client
             .make_request(&url)
             .and_then(|text| serde_json::from_str::<UserEntries>(&text).map_err(|err| err.into()))
