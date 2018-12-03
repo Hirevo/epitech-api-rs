@@ -2,7 +2,7 @@ version: 2
 jobs:
   build:
     docker:
-      - image: nicolaspolomack/debian-rust
+      - image: debian:latest
     working_directory: /build/epitech-api-rs
     steps:
       - checkout:
@@ -10,7 +10,13 @@ jobs:
       - run:
           name: Standard build
           command: |
-            source ~/.bashrc
+            apt update -y
+            apt upgrade -y
+            apt install -y curl gcc g++ pkg-config openssl libssl-dev
+            curl https://sh.rustup.rs -sSf | sh -s -- -y
+            source $HOME/.cargo/env
+            rustup update
+            cargo update
             cargo build
       # - run:
       #     name: Cargo tests
