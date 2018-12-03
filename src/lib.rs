@@ -62,6 +62,8 @@ pub enum Promo {
     Tek1,
     Tek2,
     Tek3,
+    Wac1,
+    Wac2,
 }
 
 #[derive(Debug, Clone)]

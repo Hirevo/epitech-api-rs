@@ -22,10 +22,12 @@ lazy_static! {
         map
     };
     pub static ref PROMO_TABLE: HashMap<Promo, &'static str> = {
-        let mut map = HashMap::with_capacity(3);
+        let mut map = HashMap::with_capacity(5);
         map.insert(Promo::Tek1, "tek1");
         map.insert(Promo::Tek2, "tek2");
         map.insert(Promo::Tek3, "tek3");
+        map.insert(Promo::Wac1, "wac1");
+        map.insert(Promo::Wac2, "wac2");
         map
     };
 }
