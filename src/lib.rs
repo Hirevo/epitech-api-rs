@@ -72,7 +72,7 @@ pub struct StudentListFetchBuilder {
     location: Option<Location>,
     promo: Option<Promo>,
     year: u32,
-    course: String,
+    course: Option<String>,
     active: bool,
     offset: u32,
 }
@@ -304,7 +304,7 @@ impl StudentListFetchBuilder {
             active: true,
             offset: 0,
             year: Local::now().date().year() as u32,
-            course: String::from("bachelor/classic"),
+            course: None,
         }
     }
 
@@ -317,8 +317,11 @@ impl StudentListFetchBuilder {
             url.push_str(format!("&promo={}", promo).as_ref());
         }
         url.push_str(format!("&year={}", self.year).as_ref());
-        url.push_str(format!("&course={}", self.course).as_ref());
+        if let Some(ref course) = self.course {
+            url.push_str(format!("&course={}", course).as_ref());
+        }
         url.push_str(format!("&active={}", self.active).as_ref());
+        println!("URI: {}", url);
         self.client
             .make_request(&url)
             .and_then(|text| serde_json::from_str::<UserEntries>(&text).map_err(|err| err.into()))
@@ -375,7 +378,7 @@ impl StudentListFetchBuilder {
 
     #[inline]
     pub fn course<T: Into<String>>(mut self, course: T) -> StudentListFetchBuilder {
-        self.course = course.into();
+        self.course = Some(course.into());
         self
     }
 }
@@ -554,6 +557,20 @@ mod tests {
             .fetch_student_list()
             .location(Location::Strasbourg)
             .promo(Promo::Tek2)
+            .year(2018)
+            .send();
+        assert!(list.is_ok());
+    }
+
+    #[test]
+    fn fetch_wac_student_list() {
+        let ret = get_client();
+        assert!(ret.is_ok());
+        let api = ret.unwrap();
+        let list = api
+            .fetch_student_list()
+            .location(Location::Strasbourg)
+            .promo(Promo::Wac1)
             .year(2018)
             .send();
         assert!(list.is_ok());
