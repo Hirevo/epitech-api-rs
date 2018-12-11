@@ -2,7 +2,7 @@ version: 2
 jobs:
   build:
     docker:
-      - image: debian:latest
+      - image: rust:latest
     working_directory: /build/epitech-api-rs
     steps:
       - checkout:
@@ -10,14 +10,10 @@ jobs:
       - run:
           name: Standard build
           command: |
-            apt update -y
-            apt upgrade -y
-            apt install -y curl gcc g++ pkg-config openssl libssl-dev
-            curl https://sh.rustup.rs -sSf | sh -s -- -y
-            source $HOME/.cargo/env
-            rustup update
-            cargo update
+            echo "{\"autologin\":\"$EPITECH_AUTOLOGIN\"}" > test-config.json
             cargo build
-      # - run:
-      #     name: Cargo tests
-      #     command: cargo test
+      - run:
+          name: Unit tests
+          command: |
+            echo "{\"autologin\":\"$EPITECH_AUTOLOGIN\"}" > test-config.json
+            cargo test
