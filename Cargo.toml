@@ -1,11 +1,12 @@
 [package]
 name = "epitech_api"
-version = "0.1.15"
-authors = ["Hirevo <nipolom@live.fr>"]
+version = "0.1.16"
+edition = "2018"
+authors = ["Nicolas Polomack <nicolas@polomack.eu>"]
 description = "A library for interacting with the EPITECH intranet API built on top of reqwest"
 readme = "README.md"
-keywords = ["epitech", "api", "intranet"]
-categories = ["web-programming"]
+keywords = ["epitech", "api", "web", "intranet"]
+categories = ["web-programming", "api-bindings"]
 repository = "https://github.com/Hirevo/epitech-api-rs"
 license = "MIT"
 
@@ -14,10 +15,9 @@ circle-ci = { repository = "Hirevo/epitech-api-rs", branch = "master" }
 maintenance = { status = "actively-developed" }
 
 [dependencies]
-reqwest = "^0.9.3"
-chrono = "^0.4.6"
-serde = "^1.0.80"
-serde_derive = "^1.0.80"
-serde_json = "^1.0.32"
-hyper = "^0.12.12"
-lazy_static = "^1.1.0"
+reqwest = { version = "0.9.22" }
+chrono = { version = "0.4.9" }
+serde = { version = "1.0.101", features = ["derive"] }
+json = { package = "serde_json", version = "1.0.41" }
+thiserror = { version = "1.0.1" }
+enum-iterator = { version = "0.5.0" }

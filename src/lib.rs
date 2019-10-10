@@ -1,30 +1,20 @@
-#![allow(dead_code)]
+use std::fmt;
 
-extern crate chrono;
-extern crate hyper;
-extern crate reqwest;
-extern crate serde;
-extern crate serde_json;
-#[macro_use]
-extern crate serde_derive;
-#[macro_use]
-extern crate lazy_static;
-
-mod constants;
-pub mod error;
-pub mod response;
-
-use std::default::Default;
-use std::fmt::Display;
 use std::str::FromStr;
 
 use chrono::prelude::*;
+use enum_iterator::IntoEnumIterator;
 use reqwest::header;
 use serde::{de::Visitor, Deserialize, Deserializer, Serialize, Serializer};
 
-use error::EpitechClientError;
+pub mod error;
+pub mod response;
 
-#[derive(Debug, Clone)]
+use crate::error::EpitechClientError;
+
+pub static ENDPOINT: &str = "https://intra.epitech.eu";
+
+#[derive(Debug, Clone, Default)]
 pub struct EpitechClientBuilder {
     autologin: String,
     retry_count: u32,
@@ -38,7 +28,7 @@ pub struct EpitechClient {
     login: String,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Eq, Ord, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Eq, Ord, Hash, IntoEnumIterator)]
 pub enum Location {
     Bordeaux,
     LaReunion,
@@ -57,7 +47,7 @@ pub enum Location {
     Barcelone,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Eq, Ord, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Eq, Ord, Hash, IntoEnumIterator)]
 pub enum Promo {
     Tek1,
     Tek2,
@@ -66,7 +56,7 @@ pub enum Promo {
     Wac2,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct StudentListFetchBuilder {
     client: EpitechClient,
     location: Option<Location>,
@@ -77,7 +67,7 @@ pub struct StudentListFetchBuilder {
     offset: u32,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct StudentDataFetchBuilder {
     client: EpitechClient,
     login: Option<String>,
@@ -98,7 +88,7 @@ impl EpitechClientBuilder {
     }
 
     #[inline]
-    pub fn autologin<'a, T: Into<String>>(mut self, autologin: T) -> EpitechClientBuilder {
+    pub fn autologin<T: Into<String>>(mut self, autologin: T) -> EpitechClientBuilder {
         self.autologin = autologin.into();
         self
     }
@@ -174,12 +164,12 @@ impl EpitechClient {
     pub fn make_request<T: ToString>(&self, url: T) -> Result<String, EpitechClientError> {
         let mut string = url.to_string();
         if !string.contains("&format=json") && !string.contains("?format=json") {
-            let b = string.contains("?");
+            let b = string.contains('?');
             string.push(if b { '&' } else { '?' });
             string.push_str("format=json");
         }
-        if !string.starts_with(constants::ENDPOINT) {
-            string.insert_str(0, constants::ENDPOINT);
+        if !string.starts_with(ENDPOINT) {
+            string.insert_str(0, ENDPOINT);
         }
         for _ in 0..self.retry_count {
             let ret = self
@@ -208,7 +198,7 @@ impl EpitechClient {
     ) -> Result<Vec<response::UserNetsoulEntry>, EpitechClientError> {
         let url = format!("/user/{}/netsoul", login);
         self.make_request(url)
-            .and_then(|text| serde_json::from_str(&text).map_err(|err| err.into()))
+            .and_then(|text| json::from_str(&text).map_err(|err| err.into()))
     }
 
     pub fn fetch_own_student_netsoul(
@@ -223,7 +213,7 @@ impl EpitechClient {
     ) -> Result<response::UserNotes, EpitechClientError> {
         let url = format!("/user/{}/notes", login);
         self.make_request(url)
-            .and_then(|text| serde_json::from_str(&text).map_err(|err| err.into()))
+            .and_then(|text| json::from_str(&text).map_err(|err| err.into()))
     }
 
     pub fn fetch_own_student_notes(&self) -> Result<response::UserNotes, EpitechClientError> {
@@ -236,7 +226,7 @@ impl EpitechClient {
     ) -> Result<response::UserBinome, EpitechClientError> {
         let url = format!("/user/{}/binome", login);
         self.make_request(url)
-            .and_then(|text| serde_json::from_str(&text).map_err(|err| err.into()))
+            .and_then(|text| json::from_str(&text).map_err(|err| err.into()))
     }
 
     pub fn fetch_own_student_binomes(&self) -> Result<response::UserBinome, EpitechClientError> {
@@ -249,7 +239,7 @@ impl EpitechClient {
     ) -> Result<Vec<response::UserSearchResultEntry>, EpitechClientError> {
         let url = format!("/complete/user?format=json&contains&search={}", login);
         self.make_request(url)
-            .and_then(|text| serde_json::from_str(&text).map_err(|err| err.into()))
+            .and_then(|text| json::from_str(&text).map_err(|err| err.into()))
     }
 
     pub fn fetch_available_courses(
@@ -263,7 +253,7 @@ impl EpitechClient {
             location, year, active
         );
         self.make_request(url)
-            .and_then(|text| serde_json::from_str(&text).map_err(|err| err.into()))
+            .and_then(|text| json::from_str(&text).map_err(|err| err.into()))
     }
 
     pub fn fetch_available_promos(
@@ -278,7 +268,7 @@ impl EpitechClient {
             location, year, course, active
         );
         self.make_request(url)
-            .and_then(|text| serde_json::from_str(&text).map_err(|err| err.into()))
+            .and_then(|text| json::from_str(&text).map_err(|err| err.into()))
     }
 }
 
@@ -323,7 +313,7 @@ impl StudentListFetchBuilder {
         url.push_str(format!("&active={}", self.active).as_ref());
         self.client
             .make_request(&url)
-            .and_then(|text| serde_json::from_str::<UserEntries>(&text).map_err(|err| err.into()))
+            .and_then(|text| json::from_str::<UserEntries>(&text).map_err(|err| err.into()))
             .and_then(|mut v| {
                 let state: usize = (self.offset as usize) + v.items.len();
                 if state == v.total {
@@ -399,11 +389,11 @@ impl StudentDataFetchBuilder {
             .unwrap_or_else(|| String::from("/user"));
         self.client
             .make_request(url)
-            .and_then(|text| serde_json::from_str(&text).map_err(|err| err.into()))
+            .and_then(|text| json::from_str(&text).map_err(|err| err.into()))
     }
 
     #[inline]
-    pub fn client<'a>(mut self, client: EpitechClient) -> StudentDataFetchBuilder {
+    pub fn client(mut self, client: EpitechClient) -> StudentDataFetchBuilder {
         self.client = client;
         self
     }
@@ -468,44 +458,74 @@ impl Serialize for Location {
 impl FromStr for Location {
     type Err = ();
     fn from_str(string: &str) -> Result<Self, Self::Err> {
-        for it in constants::LOCATION_TABLE.iter() {
-            if string == *it.1 {
-                return Ok(*it.0);
-            }
+        match string {
+            "ES/BAR" => Ok(Location::Barcelone),
+            "DE/BER" => Ok(Location::Berlin),
+            "FR/BDX" => Ok(Location::Bordeaux),
+            "FR/RUN" => Ok(Location::LaReunion),
+            "FR/LIL" => Ok(Location::Lille),
+            "FR/LYN" => Ok(Location::Lyon),
+            "FR/MAR" => Ok(Location::Marseille),
+            "FR/MPL" => Ok(Location::Montpellier),
+            "FR/NCY" => Ok(Location::Nancy),
+            "FR/NAN" => Ok(Location::Nantes),
+            "FR/NCE" => Ok(Location::Nice),
+            "FR/PAR" => Ok(Location::Paris),
+            "FR/REN" => Ok(Location::Rennes),
+            "FR/STG" => Ok(Location::Strasbourg),
+            "FR/TLS" => Ok(Location::Toulouse),
+            _ => Err(()),
         }
-        Err(())
     }
 }
 
-impl Display for Location {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        let ret = constants::LOCATION_TABLE
-            .get(self)
-            .map(|val| *val)
-            .unwrap_or("Unknown");
-        write!(f, "{}", ret)
+impl fmt::Display for Location {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let repr = match self {
+            Location::Barcelone => "ES/BAR",
+            Location::Berlin => "DE/BER",
+            Location::Bordeaux => "FR/BDX",
+            Location::LaReunion => "FR/RUN",
+            Location::Lille => "FR/LIL",
+            Location::Lyon => "FR/LYN",
+            Location::Marseille => "FR/MAR",
+            Location::Montpellier => "FR/MPL",
+            Location::Nancy => "FR/NCY",
+            Location::Nantes => "FR/NAN",
+            Location::Nice => "FR/NCE",
+            Location::Paris => "FR/PAR",
+            Location::Rennes => "FR/REN",
+            Location::Strasbourg => "FR/STG",
+            Location::Toulouse => "FR/TLS",
+        };
+        write!(f, "{}", repr)
     }
 }
 
 impl FromStr for Promo {
     type Err = ();
     fn from_str(string: &str) -> Result<Self, Self::Err> {
-        for it in constants::PROMO_TABLE.iter() {
-            if string == *it.1 {
-                return Ok(*it.0);
-            }
+        match string {
+            "tek1" => Ok(Promo::Tek1),
+            "tek2" => Ok(Promo::Tek2),
+            "tek3" => Ok(Promo::Tek3),
+            "wac1" => Ok(Promo::Wac1),
+            "wac2" => Ok(Promo::Wac2),
+            _ => Err(()),
         }
-        Err(())
     }
 }
 
-impl Display for Promo {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        let ret = constants::PROMO_TABLE
-            .get(self)
-            .map(|val| *val)
-            .unwrap_or("Unknown");
-        write!(f, "{}", ret)
+impl fmt::Display for Promo {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let repr = match self {
+            Promo::Tek1 => "tek1",
+            Promo::Tek2 => "tek2",
+            Promo::Tek3 => "tek3",
+            Promo::Wac1 => "wac1",
+            Promo::Wac2 => "wac2",
+        };
+        write!(f, "{}", repr)
     }
 }
 
@@ -521,7 +541,7 @@ mod tests {
             .read_to_string(&mut contents)
             .unwrap();
         let val = String::from(
-            serde_json::from_str::<serde_json::Value>(&contents)
+            json::from_str::<json::Value>(&contents)
                 .unwrap()
                 .as_object()
                 .unwrap()
@@ -581,19 +601,21 @@ mod tests {
         assert!(ret.is_ok());
         let api = ret.unwrap();
         let mut list = Vec::default();
-        for promo in constants::PROMO_TABLE.iter() {
-            for location in constants::LOCATION_TABLE.iter() {
-                println!("{} {}", promo.0, location.0);
-                let ret = api
+        for promo in Promo::into_enum_iter() {
+            for location in Location::into_enum_iter() {
+                println!("{} {}", promo, location);
+                let students = api
                     .fetch_student_list()
-                    .location(*location.0)
-                    .promo(*promo.0)
-                    .year(2017)
+                    .location(location)
+                    .promo(promo)
+                    .year(2019)
                     .send();
-                list.append(&mut ret.unwrap_or(Vec::default()));
+                if let Ok(mut students) = students {
+                    list.append(&mut students);
+                }
             }
         }
-        assert!(list.len() != 0);
+        assert!(!list.is_empty());
     }
 
     #[test]
@@ -654,6 +676,7 @@ mod tests {
     }
 
     // #[test]
+    #[allow(unused)]
     fn fetch_all_gpas() {
         let client = get_client().unwrap();
         let list = client
@@ -668,13 +691,14 @@ mod tests {
             .map(|elem| {
                 let ret = client
                     .fetch_student_data()
-                    .login(elem.login.as_ref())
+                    .login(elem.login.as_str())
                     .send();
                 if let Err(err) = &ret {
                     println!("GPA Fetch: {} [{}]", elem.login, err);
                 }
                 ret
-            }).filter(|ret| ret.is_ok())
+            })
+            .filter(|ret| ret.is_ok())
             .map(|ret| ret.unwrap())
             .map(|data| {
                 (
@@ -689,7 +713,8 @@ mod tests {
                         .parse()
                         .expect("Can't map GPA to a float."),
                 )
-            }).collect();
+            })
+            .collect();
         for (firstname, lastname, login, gpa) in data {
             println!("{} {} [{}]: {}", firstname, lastname, login, gpa);
         }

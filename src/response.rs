@@ -1,6 +1,6 @@
-use serde_json;
+use serde::{Deserialize, Serialize};
 
-use Location;
+use crate::Location;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UserEntry {
@@ -88,13 +88,13 @@ pub struct UserData {
     pub school_title: Option<String>,
     pub old_id_promo: Option<String>,
     pub old_id_location: Option<String>,
-    pub rights: serde_json::Value,
+    pub rights: json::Value,
     pub invited: bool,
     pub studentyear: Option<u32>,
     pub admin: bool,
     pub editable: bool,
     pub groups: Vec<UserDataGroup>,
-    pub events: Option<Vec<serde_json::Value>>,
+    pub events: Option<Vec<json::Value>>,
     pub credits: Option<u32>,
     pub gpa: Option<Vec<UserDataGPA>>,
     pub spice: Option<UserDataSpice>,
