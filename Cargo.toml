@@ -1,6 +1,6 @@
 [package]
 name = "epitech_api"
-version = "0.1.16"
+version = "0.1.17"
 edition = "2018"
 authors = ["Nicolas Polomack <nicolas@polomack.eu>"]
 description = "A library for interacting with the EPITECH intranet API built on top of reqwest"
