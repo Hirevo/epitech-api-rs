@@ -45,6 +45,9 @@ pub enum Location {
     Toulouse,
     Berlin,
     Barcelone,
+    Bruxelles,
+    Cotonou,
+    Tirana,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Eq, Ord, Hash, IntoEnumIterator)]
@@ -437,12 +440,10 @@ impl<'de> Deserialize<'de> for Location {
             }
         }
 
-        deserializer
-            .deserialize_string(StringVisitor)
-            .and_then(|val| {
-                val.parse()
-                    .map_err(|_| serde::de::Error::custom("Error deserializing Location."))
-            })
+        deserializer.deserialize_str(StringVisitor).and_then(|val| {
+            val.parse()
+                .map_err(|_| serde::de::Error::custom("error deserializing `Location`."))
+        })
     }
 }
 
@@ -474,6 +475,9 @@ impl FromStr for Location {
             "FR/REN" => Ok(Location::Rennes),
             "FR/STG" => Ok(Location::Strasbourg),
             "FR/TLS" => Ok(Location::Toulouse),
+            "BJ/COT" => Ok(Location::Cotonou),
+            "AL/TIR" => Ok(Location::Tirana),
+            "BE/BRU" => Ok(Location::Bruxelles),
             _ => Err(()),
         }
     }
@@ -497,6 +501,9 @@ impl fmt::Display for Location {
             Location::Rennes => "FR/REN",
             Location::Strasbourg => "FR/STG",
             Location::Toulouse => "FR/TLS",
+            Location::Bruxelles => "BE/BRU",
+            Location::Cotonou => "BJ/COT",
+            Location::Tirana => "AL/TIR",
         };
         write!(f, "{}", repr)
     }
@@ -579,6 +586,24 @@ mod tests {
             .year(2018)
             .send();
         assert!(list.is_ok());
+    }
+
+    #[test]
+    fn fetch_city_list() {
+        #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+        struct Region {
+            code: Location,
+            title: String,
+            students: String,
+        }
+        let ret = get_client();
+        assert!(ret.is_ok());
+        let api = ret.unwrap();
+        let list = api.make_request("/user/filter/location?active=true");
+        assert!(list.is_ok());
+        let list = list.unwrap();
+        let data = json::from_str::<Vec<Region>>(list.as_str());
+        assert!(data.is_ok());
     }
 
     #[test]
