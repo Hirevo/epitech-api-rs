@@ -29,7 +29,7 @@ fn fetch_student_list() {
         .fetch_student_list()
         .location(Location::Strasbourg)
         .promo(Promo::Tek2)
-        .year(2018)
+        .year(2019)
         .send();
     assert!(list.is_ok());
 }
