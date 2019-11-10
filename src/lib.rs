@@ -57,6 +57,8 @@ pub enum Promo {
     Tek3,
     Wac1,
     Wac2,
+    Msc3,
+    Msc4,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -518,6 +520,8 @@ impl FromStr for Promo {
             "tek3" => Ok(Promo::Tek3),
             "wac1" => Ok(Promo::Wac1),
             "wac2" => Ok(Promo::Wac2),
+            "msc3" => Ok(Promo::Msc3),
+            "msc4" => Ok(Promo::Msc4),
             _ => Err(()),
         }
     }
@@ -531,6 +535,8 @@ impl fmt::Display for Promo {
             Promo::Tek3 => "tek3",
             Promo::Wac1 => "wac1",
             Promo::Wac2 => "wac2",
+            Promo::Msc3 => "msc3",
+            Promo::Msc4 => "msc4",
         };
         write!(f, "{}", repr)
     }
