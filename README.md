@@ -1,25 +1,28 @@
 EPITECH-API
 ===========
 
-This is a Rust library built on top of [reqwest](https://github.com/seanmonstar/reqwest/) for interacting with the EPITECH intranet.  
+This is a Rust library built on top of [reqwest](https://github.com/seanmonstar/reqwest) for interacting with the EPITECH intranet.  
 This library focuses on ease-of-use and type-safety.  
 
 Goal
 ----
 
-This project aims to stick a type on intranet resources so that every possible members are clearly represented and safely accessible (through custom Deserialize trait implementations).  
+This project aims to stick a type on intranet resources so that every possible members are clearly represented and safely accessible.  
 
 How to use
 ----------
 
-Everything originates from the `EpitechClient` struct.
+Everything originates from the `Client` struct.
 
-You can create an `EpitechClient` this way:
+You can create an `Client` this way:
 
 ```rust
-let result = EpitechClient::builder()
+use epitech_api::{Client, Error};
+
+let result = Client::builder()
     .autologin("[INSERT AUTOLOGIN LINK HERE]")
-    .authenticate(); // This returns a `Result<EpitechClient, EpitechClientError>`.
+    .authenticate()
+    .await; // This returns a `Result<Client, Error>`.
 
 let client = match result {
     Ok(client) => client,
@@ -32,20 +35,21 @@ Right after this, you're already authenticated to the intranet and ready to proc
 You can, for instance, request the list of all students in a promotion this way:
 
 ```rust
-// This makes the request and returns a `Result<Vec<UserEntry>, EpitechClientError>`.
-let result = api.fetch_student_list()
+// This makes the request and returns a `Result<Vec<UserEntry>, Error>`.
+let result = client.fetch_student_list()
     .location(Location::Strasbourg)
     .promo(Promo::Tek2)
-    .year(2017)
-    .send();
+    .year(2020)
+    .send()
+    .await;
 ```
 
-`EpitechClient::make_request` allows you to make an arbitrary request to the intranet (therefore also losing type-safety):
+`Client::make_request` allows you to make an arbitrary request to the intranet:
 
 ```rust
 // Notice that only the path component of the route can be passed to the method.
-let my_student_infos = match client.make_request("/user") {
-    Ok(text) => , // Here, `text` represents the raw intranet response body.
-    Err(err) => , // Handle request error here.
+let my_student_infos = match client.make_request("/user").await {
+    Ok(text: String) => , // Here, `text` represents the raw intranet response body.
+    Err(err: Error) => , // Handle request error here.
 };
 ```

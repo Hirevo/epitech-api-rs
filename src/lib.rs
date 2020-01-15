@@ -1,11 +1,12 @@
 use std::fmt;
-
+use std::future::Future;
+use std::pin::Pin;
 use std::str::FromStr;
 
 use chrono::prelude::*;
 use enum_iterator::IntoEnumIterator;
 use reqwest::header;
-use serde::{de::Visitor, Deserialize, Deserializer, Serialize, Serializer};
+use serde::{Deserialize, Serialize};
 
 pub mod error;
 pub mod response;
@@ -13,60 +14,109 @@ pub mod response;
 #[cfg(test)]
 mod tests;
 
-use crate::error::EpitechClientError;
+use crate::error::Error;
 
 pub static ENDPOINT: &str = "https://intra.epitech.eu";
 
 #[derive(Debug, Clone, Default)]
-pub struct EpitechClientBuilder {
+pub struct ClientBuilder {
     autologin: String,
     retry_count: u32,
 }
 
 #[derive(Debug, Clone)]
-pub struct EpitechClient {
+pub struct Client {
     autologin: String,
     retry_count: u32,
     client: reqwest::Client,
     login: String,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Eq, Ord, Hash, IntoEnumIterator)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    PartialOrd,
+    Eq,
+    Ord,
+    Hash,
+    Serialize,
+    Deserialize,
+    IntoEnumIterator,
+)]
 pub enum Location {
-    Bordeaux,
-    LaReunion,
-    Lille,
-    Lyon,
-    Marseille,
-    Montpellier,
-    Nancy,
-    Nantes,
-    Nice,
-    Paris,
-    Rennes,
-    Strasbourg,
-    Toulouse,
-    Berlin,
+    #[serde(rename = "ES/BAR")]
     Barcelone,
-    Bruxelles,
+    #[serde(rename = "DE/BER")]
+    Berlin,
+    #[serde(rename = "FR/BDX")]
+    Bordeaux,
+    #[serde(rename = "FR/RUN")]
+    LaReunion,
+    #[serde(rename = "FR/LIL")]
+    Lille,
+    #[serde(rename = "FR/LYN")]
+    Lyon,
+    #[serde(rename = "FR/MAR")]
+    Marseille,
+    #[serde(rename = "FR/MPL")]
+    Montpellier,
+    #[serde(rename = "FR/NCY")]
+    Nancy,
+    #[serde(rename = "FR/NAN")]
+    Nantes,
+    #[serde(rename = "FR/NCE")]
+    Nice,
+    #[serde(rename = "FR/PAR")]
+    Paris,
+    #[serde(rename = "FR/REN")]
+    Rennes,
+    #[serde(rename = "FR/STG")]
+    Strasbourg,
+    #[serde(rename = "FR/TLS")]
+    Toulouse,
+    #[serde(rename = "BJ/COT")]
     Cotonou,
+    #[serde(rename = "AL/TIR")]
     Tirana,
+    #[serde(rename = "BE/BRU")]
+    Bruxelles,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Eq, Ord, Hash, IntoEnumIterator)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    PartialOrd,
+    Eq,
+    Ord,
+    Hash,
+    Serialize,
+    Deserialize,
+    IntoEnumIterator,
+)]
 pub enum Promo {
+    #[serde(rename = "tek1")]
     Tek1,
+    #[serde(rename = "tek2")]
     Tek2,
+    #[serde(rename = "tek3")]
     Tek3,
+    #[serde(rename = "wac1")]
     Wac1,
+    #[serde(rename = "wac2")]
     Wac2,
+    #[serde(rename = "msc3")]
     Msc3,
+    #[serde(rename = "msc4")]
     Msc4,
 }
 
 #[derive(Debug, Clone, Default)]
 pub struct StudentListFetchBuilder {
-    client: EpitechClient,
+    client: Client,
     location: Option<Location>,
     promo: Option<Promo>,
     year: u32,
@@ -77,7 +127,7 @@ pub struct StudentListFetchBuilder {
 
 #[derive(Debug, Clone, Default)]
 pub struct StudentDataFetchBuilder {
-    client: EpitechClient,
+    client: Client,
     login: Option<String>,
 }
 
@@ -87,89 +137,83 @@ struct UserEntries {
     pub items: Vec<response::UserEntry>,
 }
 
-impl EpitechClientBuilder {
-    pub fn new() -> EpitechClientBuilder {
-        EpitechClientBuilder {
+impl ClientBuilder {
+    pub fn new() -> ClientBuilder {
+        ClientBuilder {
             autologin: String::default(),
             retry_count: 5,
         }
     }
 
     #[inline]
-    pub fn autologin<T: Into<String>>(mut self, autologin: T) -> EpitechClientBuilder {
+    pub fn autologin<T: Into<String>>(mut self, autologin: T) -> ClientBuilder {
         self.autologin = autologin.into();
         self
     }
 
     #[inline]
-    pub fn retry_count(mut self, retry_count: u32) -> EpitechClientBuilder {
+    pub fn retry_count(mut self, retry_count: u32) -> ClientBuilder {
         self.retry_count = retry_count;
         self
     }
 
-    pub fn authenticate(self) -> Result<EpitechClient, EpitechClientError> {
+    pub async fn authenticate(self) -> Result<Client, Error> {
         let client = match reqwest::Client::builder()
-            .redirect(reqwest::RedirectPolicy::none())
+            .redirect(reqwest::redirect::Policy::none())
             .build()
         {
             Ok(x) => x,
-            Err(_) => return Err(EpitechClientError::InternalError),
+            Err(_) => return Err(Error::InternalError),
         };
-        match client.get(&self.autologin).send() {
-            Ok(resp) => {
-                let opt = resp
-                    .headers()
+        match client.get(&self.autologin).send().await {
+            Ok(response) => {
+                let headers = response.headers();
+                let cookie = headers
                     .get_all(header::SET_COOKIE)
                     .iter()
                     .filter_map(|it| it.to_str().ok())
                     .find(|cookie| cookie.starts_with("user="))
                     .and_then(|cookie| cookie.split(';').nth(0))
-                    .and_then(|cookie| header::HeaderValue::from_str(cookie).ok());
-                match opt {
-                    Some(cookie) => {
-                        let mut headers = header::HeaderMap::new();
-                        headers.insert(header::COOKIE, cookie);
-                        let mut client = EpitechClient {
-                            autologin: self.autologin.clone(),
-                            retry_count: self.retry_count,
-                            client: match reqwest::Client::builder()
-                                .default_headers(headers)
-                                .build()
-                            {
-                                Ok(x) => x,
-                                Err(_) => return Err(EpitechClientError::InternalError),
-                            },
-                            login: String::default(),
-                        };
-                        match client.fetch_student_data().send() {
-                            Ok(data) => {
-                                client.login = data.login.clone();
-                                Ok(client)
-                            }
-                            Err(err) => Err(err),
-                        }
-                    }
-                    None => Err(EpitechClientError::CookieNotFound),
-                }
+                    .and_then(|cookie| header::HeaderValue::from_str(cookie).ok())
+                    .ok_or(Error::CookieNotFound)?;
+
+                let mut headers = header::HeaderMap::new();
+                headers.insert(header::COOKIE, cookie);
+                let autologin = self.autologin;
+                let retry_count = self.retry_count;
+                let client = reqwest::Client::builder()
+                    .default_headers(headers)
+                    .build()
+                    .map_err(|_| Error::InternalError)?;
+                let login = String::default();
+                let mut client = Client {
+                    autologin,
+                    retry_count,
+                    client,
+                    login,
+                };
+                let data = client.fetch_student_data().send().await?;
+                client.login = data.login.clone();
+                Ok(client)
             }
             Err(err) => {
                 let status = err.status();
                 match status {
-                    Some(status) => Err(EpitechClientError::InvalidStatusCode(status.as_u16())),
-                    None => Err(EpitechClientError::UnreachableRemote),
+                    Some(status) => Err(Error::InvalidStatusCode(status.as_u16())),
+                    None => Err(Error::UnreachableRemote),
                 }
             }
         }
     }
 }
 
-impl EpitechClient {
+impl Client {
     #[inline]
-    pub fn builder() -> EpitechClientBuilder {
-        EpitechClientBuilder::new()
+    pub fn builder() -> ClientBuilder {
+        ClientBuilder::new()
     }
 
-    pub fn make_request<T: ToString>(&self, url: T) -> Result<String, EpitechClientError> {
+    pub async fn make_request<T: ToString>(&self, url: T) -> Result<String, Error> {
         let mut string = url.to_string();
         if !string.contains("&format=json") && !string.contains("?format=json") {
             let b = string.contains('?');
@@ -180,16 +224,16 @@ impl EpitechClient {
             string.insert_str(0, ENDPOINT);
         }
         for _ in 0..self.retry_count {
-            let ret = self
-                .client
-                .get(&string)
-                .send()
-                .and_then(|mut val| val.text());
-            if ret.is_ok() {
-                return ret.map_err(|err| err.into());
+            let result = self.client.get(&string).send().await;
+            let result = match result {
+                Ok(val) => val.text().await,
+                Err(err) => Err(err),
+            };
+            if let Ok(body) = result {
+                return Ok(body);
             }
         }
-        Err(EpitechClientError::RetryLimit)
+        Err(Error::RetryLimit)
     }
 
     pub fn fetch_student_list(&self) -> StudentListFetchBuilder {
@@ -200,90 +244,96 @@ impl EpitechClient {
         StudentDataFetchBuilder::new().client(self.clone())
     }
 
-    pub fn fetch_student_netsoul<'a>(
+    pub async fn fetch_student_netsoul<'a>(
         &self,
         login: &'a str,
-    ) -> Result<Vec<response::UserNetsoulEntry>, EpitechClientError> {
+    ) -> Result<Vec<response::UserNetsoulEntry>, Error> {
         let url = format!("/user/{}/netsoul", login);
-        self.make_request(url)
-            .and_then(|text| json::from_str(&text).map_err(|err| err.into()))
+        let response = self.make_request(url).await?;
+        let data = json::from_str(&response)?;
+        Ok(data)
     }
 
-    pub fn fetch_own_student_netsoul(
+    pub async fn fetch_own_student_netsoul(
         &self,
-    ) -> Result<Vec<response::UserNetsoulEntry>, EpitechClientError> {
-        self.fetch_student_netsoul(self.login.as_ref())
+    ) -> Result<Vec<response::UserNetsoulEntry>, Error> {
+        self.fetch_student_netsoul(self.login.as_ref()).await
     }
 
-    pub fn fetch_student_notes<'a>(
+    pub async fn fetch_student_notes<'a>(
         &self,
         login: &'a str,
-    ) -> Result<response::UserNotes, EpitechClientError> {
+    ) -> Result<response::UserNotes, Error> {
         let url = format!("/user/{}/notes", login);
-        self.make_request(url)
-            .and_then(|text| json::from_str(&text).map_err(|err| err.into()))
+        let response = self.make_request(url).await?;
+        let data = json::from_str(&response)?;
+        Ok(data)
     }
 
-    pub fn fetch_own_student_notes(&self) -> Result<response::UserNotes, EpitechClientError> {
-        self.fetch_student_notes(self.login.as_ref())
+    pub async fn fetch_own_student_notes(&self) -> Result<response::UserNotes, Error> {
+        self.fetch_student_notes(self.login.as_ref()).await
     }
 
-    pub fn fetch_student_binomes<'a>(
+    pub async fn fetch_student_binomes<'a>(
         &self,
         login: &'a str,
-    ) -> Result<response::UserBinome, EpitechClientError> {
+    ) -> Result<response::UserBinome, Error> {
         let url = format!("/user/{}/binome", login);
-        self.make_request(url)
-            .and_then(|text| json::from_str(&text).map_err(|err| err.into()))
+        let response = self.make_request(url).await?;
+        let data = json::from_str(&response)?;
+        Ok(data)
     }
 
-    pub fn fetch_own_student_binomes(&self) -> Result<response::UserBinome, EpitechClientError> {
-        self.fetch_student_binomes(self.login.as_ref())
+    pub async fn fetch_own_student_binomes(&self) -> Result<response::UserBinome, Error> {
+        self.fetch_student_binomes(self.login.as_ref()).await
     }
 
-    pub fn search_student(
+    pub async fn search_student(
         &self,
         login: &str,
-    ) -> Result<Vec<response::UserSearchResultEntry>, EpitechClientError> {
+    ) -> Result<Vec<response::UserSearchResultEntry>, Error> {
         let url = format!("/complete/user?format=json&contains&search={}", login);
-        self.make_request(url)
-            .and_then(|text| json::from_str(&text).map_err(|err| err.into()))
+        let response = self.make_request(url).await?;
+        let data = json::from_str(&response)?;
+        Ok(data)
     }
 
-    pub fn fetch_available_courses(
+    pub async fn fetch_available_courses(
         &self,
         location: Location,
         year: u32,
         active: bool,
-    ) -> Result<Vec<response::AvailableCourseEntry>, EpitechClientError> {
+    ) -> Result<Vec<response::AvailableCourseEntry>, Error> {
         let url = format!(
             "/user/filter/course?format=json&location={}&year={}&active={}",
             location, year, active
         );
-        self.make_request(url)
-            .and_then(|text| json::from_str(&text).map_err(|err| err.into()))
+        let response = self.make_request(url).await?;
+        let data = json::from_str(&response)?;
+        Ok(data)
     }
 
-    pub fn fetch_available_promos(
+    pub async fn fetch_available_promos(
         &self,
         location: Location,
         year: u32,
         course: &str,
         active: bool,
-    ) -> Result<Vec<response::AvailablePromoEntry>, EpitechClientError> {
+    ) -> Result<Vec<response::AvailablePromoEntry>, Error> {
         let url = format!(
             "/user/filter/promo?format=json&location={}&year={}&course={}&active={}",
             location, year, course, active
         );
-        self.make_request(url)
-            .and_then(|text| json::from_str(&text).map_err(|err| err.into()))
+        let response = self.make_request(url).await?;
+        let data = json::from_str(&response)?;
+        Ok(data)
     }
 }
 
-impl Default for EpitechClient {
+impl Default for Client {
     #[inline]
-    fn default() -> EpitechClient {
-        EpitechClient {
+    fn default() -> Client {
+        Client {
             autologin: String::default(),
             retry_count: 5,
             client: reqwest::Client::new(),
@@ -296,7 +346,7 @@ impl StudentListFetchBuilder {
     #[inline]
     pub fn new() -> StudentListFetchBuilder {
         StudentListFetchBuilder {
-            client: EpitechClient::default(),
+            client: Client::default(),
             location: None,
             promo: None,
             active: true,
@@ -306,39 +356,42 @@ impl StudentListFetchBuilder {
         }
     }
 
-    pub fn send(self) -> Result<Vec<response::UserEntry>, EpitechClientError> {
-        let mut url = format!("/user/filter/user?offset={}", self.offset);
-        if let Some(ref location) = self.location {
-            url.push_str(format!("&location={}", location).as_ref());
-        }
-        if let Some(ref promo) = self.promo {
-            url.push_str(format!("&promo={}", promo).as_ref());
-        }
-        url.push_str(format!("&year={}", self.year).as_ref());
-        if let Some(ref course) = self.course {
-            url.push_str(format!("&course={}", course).as_ref());
-        }
-        url.push_str(format!("&active={}", self.active).as_ref());
-        self.client
-            .make_request(&url)
-            .and_then(|text| json::from_str::<UserEntries>(&text).map_err(|err| err.into()))
-            .and_then(|mut v| {
-                let state: usize = (self.offset as usize) + v.items.len();
-                if state == v.total {
-                    Ok(v.items)
-                } else if state >= v.total {
-                    Err(EpitechClientError::InternalError)
-                } else {
-                    self.offset(state as u32).send().map(|mut x| {
-                        v.items.append(&mut x);
-                        v.items
-                    })
-                }
-            })
+    fn send_impl(self) -> Pin<Box<dyn Future<Output = Result<Vec<response::UserEntry>, Error>>>> {
+        Box::pin(async move {
+            let mut url = format!(
+                "/user/filter/user?offset={}&year={}&active={}",
+                self.offset, self.year, self.active,
+            );
+            if let Some(ref location) = self.location {
+                url = format!("{}&location={}", url, location);
+            }
+            if let Some(ref promo) = self.promo {
+                url = format!("{}&promo={}", url, promo);
+            }
+            if let Some(ref course) = self.course {
+                url = format!("{}&course={}", url, course);
+            }
+            let response = self.client.make_request(url).await?;
+            let mut data = json::from_str::<UserEntries>(&response)?;
+            let state: usize = (self.offset as usize) + data.items.len();
+            if state == data.total {
+                Ok(data.items)
+            } else if state >= data.total {
+                Err(Error::InternalError)
+            } else {
+                let mut additional = self.offset(state as u32).send_impl().await?;
+                data.items.append(&mut additional);
+                Ok(data.items)
+            }
+        })
+    }
+
+    pub async fn send(self) -> Result<Vec<response::UserEntry>, Error> {
+        self.send_impl().await
     }
 
     #[inline]
-    pub fn client(mut self, client: EpitechClient) -> StudentListFetchBuilder {
+    pub fn client(mut self, client: Client) -> StudentListFetchBuilder {
         self.client = client;
         self
     }
@@ -384,24 +437,23 @@ impl StudentDataFetchBuilder {
     #[inline]
     pub fn new() -> StudentDataFetchBuilder {
         StudentDataFetchBuilder {
-            client: EpitechClient::default(),
+            client: Client::default(),
             login: None,
         }
     }
 
-    pub fn send(self) -> Result<response::UserData, EpitechClientError> {
+    pub async fn send(self) -> Result<response::UserData, Error> {
         let url = self
             .login
-            .as_ref()
             .map(|login| format!("/user/{}", login))
             .unwrap_or_else(|| String::from("/user"));
-        self.client
-            .make_request(url)
-            .and_then(|text| json::from_str(&text).map_err(|err| err.into()))
+        let response = self.client.make_request(url).await?;
+        let data = json::from_str(&response)?;
+        Ok(data)
     }
 
     #[inline]
-    pub fn client(mut self, client: EpitechClient) -> StudentDataFetchBuilder {
+    pub fn client(mut self, client: Client) -> StudentDataFetchBuilder {
         self.client = client;
         self
     }
@@ -410,54 +462,6 @@ impl StudentDataFetchBuilder {
     pub fn login<T: Into<String>>(mut self, login: T) -> StudentDataFetchBuilder {
         self.login = Some(login.into());
         self
-    }
-}
-
-impl<'de> Deserialize<'de> for Location {
-    fn deserialize<D>(deserializer: D) -> Result<Location, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        struct StringVisitor;
-
-        impl<'a> Visitor<'a> for StringVisitor {
-            type Value = String;
-
-            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-                write!(
-                    formatter,
-                    "a string formatted like '<Country>/<City>' (eg. 'FR/STG')"
-                )
-            }
-
-            fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
-            where
-                E: serde::de::Error,
-            {
-                Ok(v.to_owned())
-            }
-
-            fn visit_string<E>(self, v: String) -> Result<Self::Value, E>
-            where
-                E: serde::de::Error,
-            {
-                Ok(v)
-            }
-        }
-
-        deserializer.deserialize_str(StringVisitor).and_then(|val| {
-            val.parse()
-                .map_err(|_| serde::de::Error::custom("error deserializing `Location`."))
-        })
-    }
-}
-
-impl Serialize for Location {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        serializer.serialize_str(self.to_string().as_ref())
     }
 }
 
