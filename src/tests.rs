@@ -34,7 +34,7 @@ async fn fetch_student_list() {
         .fetch_student_list()
         .location(Location::Strasbourg)
         .promo(Promo::Tek2)
-        .year(2020)
+        .year(2019)
         .send()
         .await;
     assert!(list.is_ok());
@@ -69,7 +69,7 @@ async fn fetch_wac_student_list() {
         .fetch_student_list()
         .location(Location::Strasbourg)
         .promo(Promo::Wac1)
-        .year(2018)
+        .year(2019)
         .send()
         .await;
     assert!(list.is_ok());
