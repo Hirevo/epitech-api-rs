@@ -182,7 +182,7 @@ async fn fetch_all_gpas() {
             .fetch_student_data()
             .login(elem.login.as_str())
             .send()
-            .inspect(|result| {
+            .inspect(move |result| {
                 if let Err(ref err) = result {
                     println!("GPA Fetch: {} [{}]", elem.login, err);
                 }
