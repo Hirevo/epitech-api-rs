@@ -1,6 +1,12 @@
 EPITECH-API
 ===========
 
+![Crates.io](https://img.shields.io/crates/v/epitech_api)
+![Crates.io](https://img.shields.io/crates/l/epitech_api)
+![Crates.io](https://img.shields.io/crates/d/epitech_api)
+[![Dependabot Status](https://api.dependabot.com/badges/status?host=github&repo=Hirevo/epitech-api-rs)](https://dependabot.com)
+
+
 This is a Rust library built on top of [reqwest](https://github.com/seanmonstar/reqwest) for interacting with the EPITECH intranet.  
 This library focuses on ease-of-use and type-safety.  
 
