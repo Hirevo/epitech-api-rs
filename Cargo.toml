@@ -19,7 +19,7 @@ chrono = "0.4.10"
 serde = { version = "1.0.104", features = ["derive"] }
 json = { package = "serde_json", version = "1.0.44" }
 thiserror = "1.0.9"
-enum-iterator = "0.5.0"
+enum-iterator = "0.6.0"
 
 [dev-dependencies]
 tokio = { version = "0.2.9", features = ["macros"] }
